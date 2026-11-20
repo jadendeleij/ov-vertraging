@@ -1,0 +1,25 @@
+name: ov_vertraging
+version: "0.1.0"
+config-version: 2
+profile: ov_vertraging
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  ov_vertraging:
+    # staging: één-op-één met de bron, opgeschoond. Views: goedkoop, altijd actueel.
+    staging:
+      +schema: staging
+      +materialized: view
+    # intermediate: koppelingen en tussenstappen.
+    intermediate:
+      +schema: intermediate
+      +materialized: table
+    # marts: wat dashboard en model gebruiken.
+    marts:
+      +schema: marts
+      +materialized: table

@@ -1,13 +1,13 @@
 # Data en databases (nooit committen)
-data/
+/data/
 *.duckdb
 *.duckdb.wal
 *.csv.gz
 !tests/fixtures/*.csv.gz
 
 # Modellen en experimenten
-models/
-mlruns/
+/models/
+/mlruns/
 
 # Secrets
 .env
@@ -24,3 +24,9 @@ __pycache__/
 .vscode/
 .DS_Store
 .ipynb_checkpoints/
+
+# dbt
+transform/target/
+transform/logs/
+transform/dbt_packages/
+transform/.user.yml
