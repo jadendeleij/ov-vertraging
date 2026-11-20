@@ -244,6 +244,24 @@ def load_split(
     return df
 
 
+def category_lists(df: pd.DataFrame) -> dict[str, list[str]]:
+    """De categorieën zoals het model ze tijdens training zag (opslaan bij het model)."""
+    return {col: [str(c) for c in df[col].cat.categories] for col in CATEGORICAL}
+
+
+def align_categories(df: pd.DataFrame, categories: dict[str, list[str]]) -> pd.DataFrame:
+    """Gebruik exact de categorieën uit de training.
+
+    LightGBM vertaalt een categorie naar haar positie in de lijst. Zonder deze stap zou
+    'UT' in de test een andere code kunnen krijgen dan in de training. Onbekende
+    waarden (bv. een nieuw station) worden NaN, en dat kan het model hanteren.
+    """
+    df = df.copy()
+    for col, cats in categories.items():
+        df[col] = pd.Categorical(df[col].astype(str), categories=cats)
+    return df
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     with duckdb.connect(str(DB_PATH)) as con:
