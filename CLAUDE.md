@@ -208,3 +208,8 @@ Werk dit bij na elke afgeronde taak (datum, wat gedaan, wat volgende stap).
   - Lokaal 02:00 komt op 25-10-2026 twee keer voor → weer koppelen op `departure_hour_utc` = `hour_start_utc` (getest).
   - Randgeval: vertrekken op 1 nov 2025 vóór 01:00 lokaal vallen vóór het eerste KNMI-uurvak (geen weer); oplossen door een maand extra weer te downloaden of te accepteren.
   - Volgende stap: intermediate (`int_station_weather_map` via haversine, per variabele dichtstbijzijnde station dat die meet; `int_departures_with_weather`).
+- 2026-11-20 — Intermediate af: macro `haversine_km`, `int_station_weather_map` (per variabele dichtstbijzijnde meetstation; NL gem. 14 km, max 36 km; > 50 km = NULL via var `weather_max_distance_km`) en `int_departures_with_weather` (19.640.496 treinvertrekken, 2.979 trajecten, 97,5% met temperatuur; tabel, bouw ~56 s). 52 dbt-tests: 51 PASS, 1 WARN (verwacht: 34.385 vertrekken vanaf buitenlandse stations zonder stationsrecord). Bevindingen:
+  - `stop_id`-volgorde ≠ tijdvolgorde bij 11.139 ritten (omleidingen: extra stop krijgt later id) → stops ordenen op geplande tijd.
+  - 6,0% van de vertrekken is geannuleerd; target in fct moet daar een keuze in maken (annuleringen apart, niet als "op tijd").
+  - Eerste blik (ongecorrigeerd, alleen indicatief): IC 6,1% vs Sprinter 3,6% ≥ 5 min; nachturen het slechtst; ma/di slechter dan weekend; vorst 6,2% en hevige regen 6,3% vs normaal 4,6%; wind ≥ 7 Bft (uurgemiddelde) nauwelijks effect → windstoten proberen. Slechtste trajecten zijn grensritten (ZV-AH 48,6%).
+  - Volgende stap: marts (`fct_departures` met `is_delayed_5min`, `dim_station`, `dim_date` met feestdagen/vakanties, `agg_route_hour`).

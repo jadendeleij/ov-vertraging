@@ -11,6 +11,8 @@ clean-targets: ["target", "dbt_packages"]
 
 vars:
   local_tz: "Europe/Amsterdam"
+  # Verder dan dit van een KNMI-station: weer is niet representatief -> NULL.
+  weather_max_distance_km: 50
 
 models:
   ov_vertraging:
