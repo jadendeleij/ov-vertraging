@@ -9,6 +9,9 @@ test-paths: ["tests"]
 target-path: "target"
 clean-targets: ["target", "dbt_packages"]
 
+vars:
+  local_tz: "Europe/Amsterdam"
+
 models:
   ov_vertraging:
     # staging: één-op-één met de bron, opgeschoond. Views: goedkoop, altijd actueel.

@@ -25,9 +25,29 @@ pytest
 python -m ov_vertraging.download --start 2025-11 --end 2026-10 --stations
 python -m ov_vertraging.download_weather --start 2025-11 --end 2026-10
 python -m ov_vertraging.load
+cd transform && dbt build && dbt docs generate
 ```
 
 Windows (PowerShell): gelijk, maar activeer met `.venv\Scripts\Activate.ps1` en gebruik `python` i.p.v. `python3`.
+
+`dbt docs serve` (in `transform/`) opent de documentatie met de lineage-grafiek in je browser.
+
+## Transformaties (dbt)
+
+Het dbt-project staat in [`transform/`](transform/) en schrijft naar dezelfde DuckDB-database, in de schema's `staging`, `intermediate` en `marts`, naast `raw`.
+
+**Staging** (views, één-op-één met de bron, opgeschoond):
+
+| Model | Wat het doet |
+|---|---|
+| `stg_services` | Tijden naar Nederlandse tijd én UTC-uur, afgeleide velden `departure_hour` en `departure_weekday`, onmogelijke vertragingen (> 600 min) naar NULL met vlag, `is_rail_service` (vervangende bussen en metro eruit te filteren). `service_max_delay_min` bewust weggelaten (leakage). |
+| `stg_stations` | Treinstations met nette namen, land en coördinaten. |
+| `stg_weather` | KNMI-codes naar °C, mm, m/s, Beaufort en meters zicht; begin van het uurvak in UTC en lokale tijd. |
+| `stg_weather_stations` | Weerstations met coördinaten en welke variabelen ze echt meten (34 van 51 meten temperatuur). |
+
+**Waarom koppelen op UTC?** Bij de overgang naar wintertijd (25 oktober 2026) komt lokaal 02:00 twee keer voor. Een koppeling op Nederlandse tijd zou dan elk vertrek aan twee weeruren hangen. In UTC is elk uur uniek. Een eigen dbt-test ([`assert_weather_dst_switch`](transform/tests/assert_weather_dst_switch.sql)) bewaakt dit.
+
+**Tests**: 37 in totaal: `unique`/`not_null` op sleutels, `accepted_values` op treintype, `relationships` tussen weer en weerstations, en eigen tests: [`value_between`](transform/tests/generic/value_between.sql) (bv. vertraging tussen −5 en 600 min), [`unique_combination`](transform/tests/generic/unique_combination.sql) (station × uur) en twee tijdzonetests.
 
 ## Data
 

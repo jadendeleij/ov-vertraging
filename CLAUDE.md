@@ -203,3 +203,8 @@ Werk dit bij na elke afgeronde taak (datum, wat gedaan, wat volgende stap).
   - Niet elk station meet alles (26% geen temperatuur) → in `int_station_weather_map` per variabele het dichtstbijzijnde station kiezen dat die variabele meet.
   - DB-bestand stabiliseert rond ~920 MB (vrije blokken na `CREATE OR REPLACE` worden hergebruikt, niet teruggegeven).
   - Volgende stap: dbt-project in `transform/` (dbt-core + dbt-duckdb toevoegen aan pyproject), `sources.yml` en `stg_*`-modellen.
+- 2026-11-20 — dbt-project opgezet in `transform/` (dbt-core 1.12 + dbt-duckdb 1.11, gepind `<2`: dbt meldt een v2-engine, maar de stack is dbt-core). Installatie trok DuckDB naar 2.0.1; tests en bestaande DB werken. Profiel in repo (geen secrets), pad overschrijfbaar via `OV_DUCKDB_PATH`. `.gitignore`: `data/`/`models/` verankerd als `/data/`/`/models/` (negeerde anders `transform/models/`). Staging af: `stg_services`, `stg_stations`, `stg_weather`, `stg_weather_stations` (views) + macro's voor Beaufort/zicht/KNMI-tienden. 37 dbt-tests groen, `dbt docs generate` werkt. Bevindingen:
+  - `accepted_values` vond 2 onbekende types in 12 maanden: `Belbus ipv trein`, `OV-bus ipv trein` (toegevoegd; `is_rail_service` = false via '%bus%').
+  - Lokaal 02:00 komt op 25-10-2026 twee keer voor → weer koppelen op `departure_hour_utc` = `hour_start_utc` (getest).
+  - Randgeval: vertrekken op 1 nov 2025 vóór 01:00 lokaal vallen vóór het eerste KNMI-uurvak (geen weer); oplossen door een maand extra weer te downloaden of te accepteren.
+  - Volgende stap: intermediate (`int_station_weather_map` via haversine, per variabele dichtstbijzijnde station dat die meet; `int_departures_with_weather`).

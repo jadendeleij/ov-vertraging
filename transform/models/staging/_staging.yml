@@ -1,0 +1,116 @@
+version: 2
+
+models:
+  - name: stg_services
+    description: >
+      Eén rij per stop van een rit. Tijden in lokale Nederlandse tijd en als UTC-uur
+      (koppelsleutel voor het weer). Onmogelijke vertragingen zijn NULL gemaakt
+      (has_invalid_delay = true). service_max_delay_min is bewust weggelaten (leakage).
+    columns:
+      - name: stop_id
+        description: Unieke sleutel van een stop.
+        data_tests: [unique, not_null]
+      - name: service_id
+        data_tests: [not_null]
+      - name: station_code
+        data_tests: [not_null]
+      - name: service_type
+        description: Treintype zoals Rijden de Treinen het noemt (Intercity, Sprinter, ...).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - Intercity
+                  - Intercity direct
+                  - Sprinter
+                  - Stoptrein
+                  - Sneltrein
+                  - ICE
+                  - EuroCity
+                  - Eurocity Direct
+                  - Eurostar
+                  - European Sleeper
+                  - Nightjet
+                  - Nachttrein
+                  - Int. Trein
+                  - GoVolta
+                  - Speciale Trein
+                  - Bus
+                  - Drempelvrije bus
+                  - Toegankelijke bus
+                  - Stopbus ipv trein
+                  - Snelbus ipv trein
+                  - Taxibus ipv trein
+                  - Belbus ipv trein
+                  - OV-bus ipv trein
+                  - Metro ipv trein
+      - name: is_rail_service
+        description: false voor vervangende bussen, taxi's en metro.
+      - name: departure_delay_min
+        description: Vertrekvertraging in minuten; NULL op eindstations en bij datafouten.
+        data_tests:
+          - value_between:
+              arguments: {min_value: -5, max_value: 600}
+      - name: arrival_delay_min
+        data_tests:
+          - value_between:
+              arguments: {min_value: -5, max_value: 600}
+      - name: departure_hour
+        description: Uur van geplande vertrektijd, lokale tijd (0-23).
+        data_tests:
+          - value_between:
+              arguments: {min_value: 0, max_value: 23}
+      - name: departure_weekday
+        description: ISO-weekdag van vertrek, 1 = maandag, 7 = zondag.
+        data_tests:
+          - value_between:
+              arguments: {min_value: 1, max_value: 7}
+      - name: departure_hour_utc
+        description: Begin van het UTC-uur van geplande vertrektijd; koppelt aan stg_weather.hour_start_utc.
+
+  - name: stg_stations
+    description: Eén rij per treinstation (591, incl. buitenland).
+    columns:
+      - name: station_code
+        data_tests: [unique, not_null]
+      - name: lat
+        data_tests: [not_null]
+      - name: lng
+        data_tests: [not_null]
+
+  - name: stg_weather_stations
+    description: Eén rij per KNMI-weerstation, met coördinaten en welke variabelen het meet.
+    columns:
+      - name: weather_station_id
+        data_tests: [unique, not_null]
+
+  - name: stg_weather
+    description: >
+      Eén rij per weerstation per uur, in °C, mm, m/s en Beaufort.
+      hour_start_utc is het begin van het KNMI-uurvak.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [weather_station_id, hour_start_utc]
+    columns:
+      - name: weather_station_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_weather_stations')
+                field: weather_station_id
+      - name: hour_start_utc
+        data_tests: [not_null]
+      - name: temperature_c
+        data_tests:
+          - value_between:
+              arguments: {min_value: -30, max_value: 45}
+      - name: precipitation_mm
+        data_tests:
+          - value_between:
+              arguments: {min_value: 0, max_value: 100}
+      - name: wind_bft
+        data_tests:
+          - value_between:
+              arguments: {min_value: 0, max_value: 12}
