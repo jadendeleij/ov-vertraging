@@ -3,6 +3,9 @@
 Gebruik:
     python -m ov_vertraging.load
 
+Na het laden draaien de datakwaliteitschecks uit quality.py; bij een fout stopt
+het script met een DataQualityError.
+
 Idempotent: de tabel wordt met CREATE OR REPLACE volledig opnieuw opgebouwd uit
 de bestanden in data/raw/services/. DuckDB leest de gzip-CSV's zelf, zodat we de
 ruwe rijen nooit in Python-geheugen hoeven te laden.
@@ -15,6 +18,7 @@ from pathlib import Path
 import duckdb
 
 from ov_vertraging.config import COLUMN_MAP, DB_PATH, SERVICES_DIR, TIMEZONE, TYPES
+from ov_vertraging.quality import assert_quality
 
 log = logging.getLogger(__name__)
 
@@ -90,6 +94,8 @@ def summarize(db_path: Path = DB_PATH) -> None:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     load_services()
+    with duckdb.connect(str(DB_PATH), read_only=True) as con:
+        assert_quality(con)
     summarize()
 
 

@@ -190,4 +190,5 @@ Werk dit bij na elke afgeronde taak (datum, wat gedaan, wat volgende stap).
   - 11% NULL vertrektijd = eindstations (verwacht).
   - Tijdzones kloppen: +02 en +01 (zomertijd eindigde 25 okt).
   - Ook bus-/metrovervanging (`... ipv trein`, `Bus`) en buitenlandse treinen in de data → filteren in staging.
-  - Volgende stap: eerste git-commit, daarna taak 5 (datakwaliteitschecks) en taak 6 (12 maanden).
+  - Eerste git-commit gemaakt (lokaal, branch main).
+- 2026-11-20 — Taak 5 af: `quality.py` met 5 checks (rijen > 0, stop_id uniek, sleutels niet NULL, elke rit ≥ 2 stops, vertraging in [−5, 600] met max 0,1% uitschieters) + NULL-% per kolom. `load` stopt met `DataQualityError` als een check faalt. Oktober: alles OK (197 uitschieters = 0,011%). 15 tests groen. Volgende stap: taak 6 (12 maanden downloaden, laadtijd + DB-grootte in README).
