@@ -1,4 +1,4 @@
-"""Laad alle gedownloade maandbestanden in DuckDB-tabel raw.services.
+"""Laad de maandbestanden in raw.services en het stationsbestand in raw.stations.
 
 Gebruik:
     python -m ov_vertraging.load
@@ -17,8 +17,17 @@ from pathlib import Path
 
 import duckdb
 
-from ov_vertraging.config import COLUMN_MAP, DB_PATH, SERVICES_DIR, TIMEZONE, TYPES
-from ov_vertraging.quality import assert_quality
+from ov_vertraging.config import (
+    COLUMN_MAP,
+    DB_PATH,
+    SERVICES_DIR,
+    STATION_COLUMN_MAP,
+    STATIONS_DIR,
+    STATIONS_FILENAME,
+    TIMEZONE,
+    TYPES,
+)
+from ov_vertraging.quality import SERVICE_CHECKS, STATION_CHECKS, assert_quality
 
 log = logging.getLogger(__name__)
 
@@ -67,6 +76,38 @@ def load_services(
     return n_rows
 
 
+def build_stations_sql(path: str) -> str:
+    """Bouw de SQL die het stationsbestand inleest met vaste kolomnamen en types."""
+    columns = ", ".join(
+        f"{_sql_str(src)}: {_sql_str(dtype)}" for src, (_, dtype) in STATION_COLUMN_MAP.items()
+    )
+    select = ",\n    ".join(f'"{src}" AS {name}' for src, (name, _) in STATION_COLUMN_MAP.items())
+    return f"""
+CREATE OR REPLACE TABLE raw.stations AS
+SELECT
+    {select},
+    {_sql_str(Path(path).name)} AS source_file
+FROM read_csv({_sql_str(path)}, header = true, columns = {{{columns}}})
+"""
+
+
+def load_stations(db_path: Path = DB_PATH, stations_file: Path | None = None) -> int:
+    """Laad het stationsbestand in raw.stations en geef het aantal rijen terug."""
+    stations_file = stations_file or STATIONS_DIR / STATIONS_FILENAME
+    if not stations_file.exists():
+        raise FileNotFoundError(
+            f"{stations_file} ontbreekt; draai eerst: python -m ov_vertraging.download --stations"
+        )
+
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    with duckdb.connect(str(db_path)) as con:
+        con.execute("CREATE SCHEMA IF NOT EXISTS raw")
+        con.execute(build_stations_sql(stations_file.as_posix()))
+        n_rows = con.execute("SELECT count(*) FROM raw.stations").fetchone()[0]
+    log.info("%d stations geladen uit %s", n_rows, stations_file.name)
+    return n_rows
+
+
 def summarize(db_path: Path = DB_PATH) -> None:
     """Print een korte samenvatting om de data op logica te controleren."""
     with duckdb.connect(str(db_path), read_only=True) as con:
@@ -94,8 +135,9 @@ def summarize(db_path: Path = DB_PATH) -> None:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     load_services()
+    load_stations()
     with duckdb.connect(str(DB_PATH), read_only=True) as con:
-        assert_quality(con)
+        assert_quality(con, SERVICE_CHECKS + STATION_CHECKS)
     summarize()
 
 

@@ -1,0 +1,15 @@
+id,code,uic,name_short,name_medium,name_long,slug,country,type,geo_lat,geo_lng
+266,HT,8400319,"Den Bosch",'s-Hertogenbosch,'s-Hertogenbosch,s-hertogenbosch,NL,knooppuntIntercitystation,51.69048,5.29362
+553,EABG,8021148,Altenberge,Altenberge,Altenberge,altenberge,D,stoptreinstation,52.05223,7.481202
+43,ASD,8400058,"Amsterdm C","Amsterdam C.","Amsterdam Centraal",amsterdam-centraal,NL,megastation,52.378887176514,4.9002776145935
+144,DT,8400170,Delft,Delft,Delft,delft,NL,knooppuntIntercitystation,52.00666809082,4.3563890457153
+213,GV,8400280,"Dn Haag HS","Den Haag HS","Den Haag HS",den-haag-hs,NL,knooppuntIntercitystation,52.069721221924,4.3225002288818
+195,GD,8400258,Gouda,Gouda,Gouda,gouda,NL,knooppuntIntercitystation,52.017501831055,4.7044444084167
+308,LEDN,8400390,"Leiden C","Leiden C.","Leiden Centraal",leiden-centraal,NL,knooppuntIntercitystation,52.166110992432,4.4816665649414
+631,ENHF,8023783,"Münster ZN","Münster Zentr N.","Münster (W) Zentrum Nord",munster-w-zentrum-nord,D,stoptreinstation,51.984987,7.63861
+346,MUNST,8021011,Münster,"Münster (Westf)","Münster (Westf) Hbf",munster-westf-hbf,D,knooppuntIntercitystation,51.956892,7.635895
+632,ENBE,8021147,Münster-H,Münster-Häger,Münster-Häger,munster-hager,D,stoptreinstation,52.022327,7.562668
+633,ENOW,8021149,Nordwalde,Nordwalde,Nordwalde,nordwalde,D,stoptreinstation,52.077618,7.461706
+411,RTD,8400530,"Rotterdm C","Rotterdam C.","Rotterdam Centraal",rotterdam-centraal,NL,megastation,51.92499923706,4.468888759613
+428,SHL,8400561,Schiphol,"Schiphol Airport","Schiphol Airport",schiphol-airport,NL,megastation,52.30944442749,4.7619442939758
+467,UT,8400621,"Utrecht C","Utrecht C.","Utrecht Centraal",utrecht-centraal,NL,megastation,52.088890075684,5.1102776527405
