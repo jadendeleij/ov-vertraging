@@ -34,3 +34,7 @@ transform/.user.yml
 # Dagster (lokale run-historie en logs)
 .dagster_home/
 .tmp_dagster_home_*/
+
+# MLflow (lokale experiment-tracking)
+mlflow.db
+mlartifacts/
