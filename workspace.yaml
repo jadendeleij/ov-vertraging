@@ -1,0 +1,5 @@
+# Laat `dagster dev` (vanuit de projectroot) de definities vinden.
+load_from:
+  - python_file:
+      relative_path: orchestration/definitions.py
+      working_directory: .

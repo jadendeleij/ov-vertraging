@@ -7,30 +7,93 @@ Voorspelt de kans dat een trein in Nederland ≥ 5 minuten vertraging heeft bij 
 ## Roadmap
 
 - [x] Fase 1 – Data binnenhalen (treinarchief + stations → DuckDB, kwaliteitschecks)
-- [ ] Fase 2 – Datapipeline (KNMI-weer, dbt, Dagster)
+- [x] Fase 2 – Datapipeline (KNMI-weer, dbt, Dagster)
 - [ ] Fase 3 – Analyse & dashboard
 - [ ] Fase 4 – Model (LightGBM)
 - [ ] Fase 5 – Live API + web-app
 - [ ] Fase 6 – Presenteren
 
+## Architectuur
+
+```
+Bronnen                     raw (Python)            dbt                                   Gebruik
+Rijden de Treinen ──┐
+  treinarchief      ├──► data/raw/ ──► DuckDB raw.* ──► staging ──► intermediate ──► marts ──► dashboard / model
+  stations          │                  + 14 checks      (views)     (koppelingen)    (tabellen)
+KNMI uurweer ───────┘
+Feestdagen + schoolvakanties ─────────────────────────► seeds ──────┘
+                         Dagster draait dit elke dag om 07:00 · 69 asset checks + 51 tests
+```
+
 ## Zelf draaien
 
-macOS / Linux:
+Vereist Python 3.11–3.13 (dagster-dbt ondersteunt 3.14 nog niet). macOS / Linux:
 
 ```bash
-python3 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 pytest
+```
+
+Daarna de pipeline, óf met losse commando's:
+
+```bash
 python -m ov_vertraging.download --start 2025-11 --end 2026-10 --stations
 python -m ov_vertraging.download_weather --start 2025-11 --end 2026-10
 python -m ov_vertraging.load
 cd transform && dbt build && dbt docs generate
 ```
 
-Windows (PowerShell): gelijk, maar activeer met `.venv\Scripts\Activate.ps1` en gebruik `python` i.p.v. `python3`.
+óf in één keer via Dagster (zie hieronder):
 
-`dbt docs serve` (in `transform/`) opent de documentatie met de lineage-grafiek in je browser.
+```bash
+dagster dev
+```
+
+Windows (PowerShell): gelijk, maar activeer met `.venv\Scripts\Activate.ps1` en gebruik `py -3.12` i.p.v. `python3.12`.
+
+`dbt docs serve` (in `transform/`) opent de dbt-documentatie met de lineage-grafiek in je browser.
+
+## Orkestratie (Dagster)
+
+[`orchestration/definitions.py`](orchestration/definitions.py) beschrijft de hele pipeline als **assets**: dingen die bestaan en ververst kunnen worden (een bestand, een tabel), met hun afhankelijkheden. Dagster leidt daaruit de volgorde af en toont de lineage.
+
+| Groep | Assets | Wat er gebeurt |
+|---|---|---|
+| `download` | `services_files`, `stations_file`, `weather_files` | Nieuwe maanden ophalen. Standaard de vorige en de huidige maand; een maand die nog niet gepubliceerd is (HTTP 404) wordt overgeslagen. |
+| `raw` | `raw/services`, `raw/stations`, `raw/weather_hourly`, `raw/weather_stations` | Laden in DuckDB. De 14 kwaliteitschecks zijn **blocking asset checks**: faalt er één, dan draait dbt niet op kapotte data. |
+| `seeds`, `staging`, `intermediate`, `marts` | 12 dbt-assets | Via `dagster-dbt`: elk dbt-model is een asset, elke dbt-test een asset check. |
+
+- **Job** `dagelijkse_pipeline`: alles, in de juiste volgorde (~1 minuut).
+- **Schema** `dagelijks_07u`: elke dag om 07:00 (Europe/Amsterdam), staat standaard aan.
+- Starten: `dagster dev` in de projectroot en open http://localhost:3000. Zet `DAGSTER_HOME` op een vaste map (bv. `export DAGSTER_HOME=$PWD/.dagster_home`) om de run-historie te bewaren. Het schema draait alleen zolang `dagster dev` draait; echt 24/7 draaien komt in fase 5 (hosting).
+- Eén keer alles draaien zonder UI: `dagster job execute -f orchestration/definitions.py -j dagelijkse_pipeline`.
+
+## Waarom drie lagen?
+
+| Laag | Vraag die de laag beantwoordt | Regel |
+|---|---|---|
+| **raw** | *Wat leverde de bron precies?* | Niets aanpassen, alleen nette kolomnamen en types. Zo kun je altijd terug naar het origineel. |
+| **staging** | *Wat betekent elke waarde?* | Opschonen per bron: eenheden (0,1 °C → °C), tijdzones, datafouten markeren. Nog geen koppelingen. |
+| **intermediate** | *Hoe hangen de bronnen samen?* | Zware koppelingen op één plek: trein → weerstation, vertrek → weer van dat uur, stop → volgend station. |
+| **marts** | *Wat heeft de gebruiker nodig?* | Eén tabel per doel: feiten (`fct_departures`), context (`dim_*`), samenvattingen (`agg_*`). |
+
+Waarom niet alles in één grote query? Elke laag heeft één verantwoordelijkheid. Klopt een cijfer in het dashboard niet, dan zie je in de lineage precies waar je moet zoeken. Een fix in staging (bv. de 24-uur-datumfout) werkt automatisch door naar alles erna. En elke laag heeft zijn eigen tests: staging test bronwaarden, marts testen de bedrijfsregels (zoals de targetdefinitie).
+
+## Wat betekent idempotent in deze pipeline?
+
+**Idempotent = een stap twee keer draaien geeft hetzelfde resultaat als één keer.** Daardoor kan het schema elke dag gewoon alles draaien, en kun je na een fout zonder nadenken opnieuw starten.
+
+| Stap | Hoe het idempotent is |
+|---|---|
+| Download treinen/stations | Bestaat het bestand al, dan wordt het overgeslagen. Downloaden gaat via een `.part`-bestand, zodat een afgebroken download nooit als compleet geldt. |
+| Download weer | Een maand wordt ververst tot hij ≥ 3 dagen na afloop is opgehaald (KNMI loopt ~2 dagen achter); daarna overgeslagen. |
+| Laden | `CREATE OR REPLACE TABLE`: de raw-tabel wordt elke keer volledig opnieuw opgebouwd uit alle bestanden, dus nooit dubbele rijen. |
+| dbt | Elk model is een `CREATE OR REPLACE` van een view of tabel, berekend uit de laag eronder. |
+| Seeds | Vaste CSV's in git; opnieuw laden geeft dezelfde tabel. |
+
+Getest: twee keer laden geeft hetzelfde aantal rijen (`test_load_is_idempotent`), en een download van een bestaand bestand doet geen netwerkverzoek.
 
 ## Transformaties (dbt)
 

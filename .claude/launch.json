@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dagster",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "mkdir -p .dagster_home && DAGSTER_HOME=$PWD/.dagster_home .venv/bin/dagster dev -p 3000"],
+      "port": 3000
+    }
+  ]
+}

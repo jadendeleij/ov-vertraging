@@ -30,3 +30,7 @@ transform/target/
 transform/logs/
 transform/dbt_packages/
 transform/.user.yml
+
+# Dagster (lokale run-historie en logs)
+.dagster_home/
+.tmp_dagster_home_*/
