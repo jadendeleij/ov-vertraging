@@ -18,12 +18,18 @@ dependencies = [
     "dagster>=1.9",
     "dagster-dbt>=0.25",
     "dagster-webserver>=1.9",
+    "pandas>=2.2",
+    "plotly>=5.24",
+    "streamlit>=1.40",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
     "ruff>=0.6",
+    # analyse-notebooks
+    "jupyter>=1.1",
+    "matplotlib>=3.9",
 ]
 
 [tool.setuptools.packages.find]

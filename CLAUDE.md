@@ -222,3 +222,9 @@ Werk dit bij na elke afgeronde taak (datum, wat gedaan, wat volgende stap).
   - dagster-dbt vindt `dbt` alleen op PATH (ook in `prepare_if_dev`) → venv-bin voorin PATH gezet in definitions.py.
   - Schema draait alleen zolang `dagster dev` draait; 24/7 = fase 5 (hosting).
   - Lineage-screenshot (door jou gemaakt) in `docs/img/dagster-lineage.png` en in README. Branch `fase-2-pipeline` gepusht en PR naar main geopend; mergen na jouw akkoord. Volgende stap: Fase 3 (branch `fase-3-analyse`).
+- 2026-11-20 — Fase 3 (branch `fase-3-analyse`): `notebooks/01_verkenning.ipynb` (zes vragen, elk grafiek + conclusie; draait foutloos van boven naar beneden met `jupyter nbconvert --execute`), `app/dashboard.py` (KPI's, heatmap, verloop per dag, stationskaart, weer, "Mijn traject") met SQL in `ov_vertraging/dashboard_queries.py` (10 tests). Deps: pandas, plotly, streamlit (runtime); jupyter, matplotlib (dev). 67 pytest-tests groen. Top 3 inzichten in README. Bevindingen:
+  - Internationale treinen (ICE 79% op UT-ASD, Eurostar) en grenslijnen domineren de slechtste trajecten → notebook toont binnenland en internationaal apart; dashboard standaard alleen binnenlandse treintypes.
+  - Slechtste dagen: 5–7 jan 2026 (sneeuw/wissels, tot 50% uitval), 17–18 nov 2025 (koperdiefstal, defecte treinen; uit RDT-storingsarchief 2025), 9 sep 2026 landelijke OV-staking (92% uitval). Storingsarchief 2026 bestaat nog niet.
+  - Gestapelde balken met verschillende noemers vermeden (vertraagd = van gereden treinen, uitval = van alle).
+  - Streamlit laadt gewijzigde geïmporteerde modules niet altijd opnieuw → na wijziging in `dashboard_queries.py` het dashboard herstarten.
+  - Dashboard-screenshot (door jou) in `docs/img/dashboard.png` en README. Branch gepusht en PR naar main geopend; mergen na jouw akkoord. Volgende stap: Fase 4 (model, branch `fase-4-model`).
