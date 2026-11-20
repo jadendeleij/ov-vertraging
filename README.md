@@ -8,10 +8,20 @@ Voorspelt de kans dat een trein in Nederland ≥ 5 minuten vertraging heeft bij 
 
 - [x] Fase 1 – Data binnenhalen (treinarchief + stations → DuckDB, kwaliteitschecks)
 - [x] Fase 2 – Datapipeline (KNMI-weer, dbt, Dagster)
-- [ ] Fase 3 – Analyse & dashboard
+- [x] Fase 3 – Analyse & dashboard
 - [ ] Fase 4 – Model (LightGBM)
 - [ ] Fase 5 – Live API + web-app
 - [ ] Fase 6 – Presenteren
+
+## Top 3 inzichten
+
+Uit 17,2 mln binnenlandse treinvertrekken (nov 2025 – okt 2026), zie [het verkenningsnotebook](notebooks/01_verkenning.ipynb):
+
+1. **Sneeuw verdubbelt de kans op vertraging** (9,4 % tegen 4,1 % normaal). Ook vorst, hevige regen, hitte (≥ 30 °C) en windstoten ≥ 9 Bft geven elk ~1,5–2 procentpunt extra; *gemiddelde* wind maakt nauwelijks uit. Temperatuur werkt als een U: kou én hitte zijn slecht.
+2. **Vertraging stapelt zich op, over de dag en over het jaar.** De avondspits (18 uur: 5,4 %) is ruim twee keer zo slecht als de vroege ochtend (5 uur: 2,5 %); november (6,2 %) en januari (5,4 %) zijn de slechtste maanden. Een Intercity is vaker te laat dan een Sprinter (6,1 % tegen 3,6 %).
+3. **Kleine vertragingen lopen meestal in.** Van de treinen met 3 minuten vertraging haalt maar 2,3 % later in de rit 10 minuten, en ruim een derde loopt in. Pas boven ~6 minuten loopt het uit de hand (bij 9 minuten: 42 %).
+
+De slechtste dagen kwamen door sneeuw en bevroren wissels (5–7 januari 2026), koperdiefstal en defecte treinen (17–18 november 2025) en een landelijke OV-staking (9 september 2026: 92 % uitval) — gebeurtenissen die geen model vooraf ziet aankomen.
 
 ## Architectuur
 
@@ -22,7 +32,7 @@ Rijden de Treinen ──┐
   stations          │                  + 14 checks      (views)     (koppelingen)    (tabellen)
 KNMI uurweer ───────┘
 Feestdagen + schoolvakanties ─────────────────────────► seeds ──────┘
-                         Dagster draait dit elke dag om 07:00 · 69 asset checks + 51 tests
+                         Dagster draait dit elke dag om 07:00 · 69 asset checks + 67 tests
 ```
 
 ## Zelf draaien
@@ -54,6 +64,26 @@ dagster dev
 Windows (PowerShell): gelijk, maar activeer met `.venv\Scripts\Activate.ps1` en gebruik `py -3.12` i.p.v. `python3.12`.
 
 `dbt docs serve` (in `transform/`) opent de dbt-documentatie met de lineage-grafiek in je browser.
+
+Dashboard en notebook (na het draaien van de pipeline):
+
+```bash
+streamlit run app/dashboard.py
+jupyter notebook notebooks/01_verkenning.ipynb
+```
+
+## Dashboard (Streamlit)
+
+[`app/dashboard.py`](app/dashboard.py) laat iedereen de data verkennen zonder SQL. Filters op periode en treintype; vier tabbladen:
+
+| Tabblad | Wat je ziet |
+|---|---|
+| 📊 Overzicht | KPI's (vertrekken, % ≥ 5 min vertraagd, % uitval, gem. vertraging), heatmap uur × weekdag, verloop per dag |
+| 🗺️ Kaart | Elk station als stip op de kaart, gekleurd op punctualiteit, plus de 15 minst stipte stations |
+| 🌧️ Weer | % vertraagd per weertype en de temperatuurcurve |
+| 🔍 Mijn traject | Kies twee stations: hoe vaak kwamen directe treinen ≥ 5 min te laat aan, en op welk uur het best? |
+
+Alle SQL staat in [`dashboard_queries.py`](src/ov_vertraging/dashboard_queries.py) (geparametriseerd, getest op een klein nepschema); het dashboard leest read-only uit de marts en doet de zware aggregaties in DuckDB.
 
 ## Orkestratie (Dagster)
 
