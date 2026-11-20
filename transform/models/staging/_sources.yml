@@ -1,0 +1,42 @@
+version: 2
+
+sources:
+  - name: raw
+    description: >
+      Ruwe tabellen, geladen door `python -m ov_vertraging.load`. Precies wat de bron
+      leverde, met nette kolomnamen en types; geen opschoning.
+    schema: raw
+    tables:
+      - name: services
+        description: >
+          Treinarchief van Rijden de Treinen (CC BY 4.0). Eén rij = één stop van één rit.
+          Tijden met tijdzone, vertragingen in minuten.
+        columns:
+          - name: stop_id
+            description: Unieke sleutel van een stop (Stop:RDT-ID).
+            data_tests: [unique, not_null]
+          - name: service_id
+            description: Sleutel van de rit (Service:RDT-ID).
+            data_tests: [not_null]
+          - name: station_code
+            data_tests: [not_null]
+
+      - name: stations
+        description: Stationsbestand van Rijden de Treinen (versie 2023-09, incl. buitenland).
+        columns:
+          - name: station_code
+            data_tests: [unique, not_null]
+
+      - name: weather_hourly
+        description: >
+          KNMI-uurwaarden per weerstation. Bron-eenheden (vaak tienden). Uur 1-24 in UTC:
+          uur 5 = 04:00-05:00 UTC.
+        columns:
+          - name: station_id
+            data_tests: [not_null]
+
+      - name: weather_stations
+        description: KNMI-weerstations met coördinaten, uit de kop van de uurbestanden.
+        columns:
+          - name: station_id
+            data_tests: [unique, not_null]

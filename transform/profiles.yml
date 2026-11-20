@@ -1,0 +1,10 @@
+# Geen secrets nodig: DuckDB is een lokaal bestand. Daarom staat dit profiel in de repo.
+# Pad is relatief aan de map waarin je dbt draait (transform/). Overschrijfbaar met
+# de omgevingsvariabele OV_DUCKDB_PATH (handig voor CI met een kleine sample-database).
+ov_vertraging:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('OV_DUCKDB_PATH', '../data/ov.duckdb') }}"
+      threads: 4

@@ -43,6 +43,17 @@ def month_range(start: str, end: str) -> list[str]:
     return months
 
 
+def recent_months(today: date, n: int = 2) -> list[str]:
+    """De laatste n maanden t/m de huidige, oudste eerst. Voor het dagelijkse schema:
+    de vorige maand verschijnt een paar dagen na afloop, de huidige pas later."""
+    y, m = today.year, today.month
+    months = []
+    for _ in range(n):
+        months.append(f"{y:04d}-{m:02d}")
+        y, m = (y - 1, 12) if m == 1 else (y, m - 1)
+    return months[::-1]
+
+
 def download_month(month: str, target_dir: Path = SERVICES_DIR) -> Path:
     """Download één maand van het treinarchief."""
     target = target_dir / SERVICES_FILENAME.format(month=month)

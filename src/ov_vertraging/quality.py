@@ -151,17 +151,96 @@ STATION_CHECKS = [
 ]
 
 
-def null_percentages(con: duckdb.DuckDBPyConnection) -> dict[str, float]:
+# ---------- raw.weather_hourly / raw.weather_stations ----------
+
+WEATHER_TABLE = "raw.weather_hourly"
+WEATHER_STATIONS_TABLE = "raw.weather_stations"
+# Bron-eenheden zijn tienden: -30,0 .. 45,0 °C en windstoten tot 60 m/s.
+T_RANGE = (-300, 450)
+FX_RANGE = (0, 600)
+
+
+def check_weather_row_count(con: duckdb.DuckDBPyConnection) -> CheckResult:
+    n = _scalar(con, f"SELECT count(*) FROM {WEATHER_TABLE}")
+    return CheckResult("weer: aantal rijen > 0", n > 0, f"{n:,} uurrijen")
+
+
+def check_weather_unique_hour(con: duckdb.DuckDBPyConnection) -> CheckResult:
+    dups = _scalar(
+        con,
+        f"""
+        SELECT count(*) FROM (
+            SELECT station_id, date, hour FROM {WEATHER_TABLE}
+            GROUP BY ALL HAVING count(*) > 1
+        )
+        """,
+    )
+    return CheckResult("weer: (station, datum, uur) uniek", dups == 0, f"{dups:,} dubbele uren")
+
+
+def check_weather_hour_range(con: duckdb.DuckDBPyConnection) -> CheckResult:
+    bad = _scalar(con, f"SELECT count(*) FROM {WEATHER_TABLE} WHERE hour NOT BETWEEN 1 AND 24")
+    return CheckResult("weer: uur tussen 1 en 24", bad == 0, f"{bad:,} ongeldig")
+
+
+def check_weather_values(con: duckdb.DuckDBPyConnection) -> CheckResult:
+    bad = _scalar(
+        con,
+        f"""
+        SELECT count(*) FROM {WEATHER_TABLE}
+        WHERE t NOT BETWEEN {T_RANGE[0]} AND {T_RANGE[1]}
+           OR fx NOT BETWEEN {FX_RANGE[0]} AND {FX_RANGE[1]}
+        """,
+    )
+    return CheckResult("weer: temperatuur en windstoten plausibel", bad == 0, f"{bad:,} ongeldig")
+
+
+def check_weather_stations_known(con: duckdb.DuckDBPyConnection) -> CheckResult:
+    unknown = _scalar(
+        con,
+        f"""
+        SELECT count(DISTINCT w.station_id)
+        FROM {WEATHER_TABLE} w ANTI JOIN {WEATHER_STATIONS_TABLE} s USING (station_id)
+        """,
+    )
+    return CheckResult(
+        "weer: elk station heeft coördinaten", unknown == 0, f"{unknown:,} onbekende stations"
+    )
+
+
+WEATHER_CHECKS = [
+    check_weather_row_count,
+    check_weather_unique_hour,
+    check_weather_hour_range,
+    check_weather_values,
+    check_weather_stations_known,
+]
+
+ALL_CHECKS = SERVICE_CHECKS + STATION_CHECKS + WEATHER_CHECKS
+
+
+def _table_exists(con: duckdb.DuckDBPyConnection, table: str) -> bool:
+    schema, name = table.split(".")
+    return bool(
+        _scalar(
+            con,
+            "SELECT count(*) FROM information_schema.tables "
+            f"WHERE table_schema = '{schema}' AND table_name = '{name}'",
+        )
+    )
+
+
+def null_percentages(con: duckdb.DuckDBPyConnection, table: str = TABLE) -> dict[str, float]:
     """Percentage NULL per kolom, in één scan over de tabel."""
-    columns = [r[0] for r in con.execute(f"DESCRIBE {TABLE}").fetchall()]
+    columns = [r[0] for r in con.execute(f"DESCRIBE {table}").fetchall()]
     # coalesce: op een lege tabel geeft avg() NULL; dan rapporteren we 0 %.
     parts = ", ".join(f'coalesce(100.0 * avg(("{c}" IS NULL)::INT), 0)' for c in columns)
-    row = con.execute(f"SELECT {parts} FROM {TABLE}").fetchone()
+    row = con.execute(f"SELECT {parts} FROM {table}").fetchone()
     return dict(zip(columns, row, strict=True))
 
 
 def run_checks(con: duckdb.DuckDBPyConnection, checks=SERVICE_CHECKS) -> list[CheckResult]:
-    """Draai de checks, log de uitkomsten en het NULL-percentage per kolom van raw.services."""
+    """Draai de checks, log de uitkomsten en het NULL-percentage per kolom."""
     results = [check(con) for check in checks]
     for r in results:
         log.log(
@@ -171,9 +250,12 @@ def run_checks(con: duckdb.DuckDBPyConnection, checks=SERVICE_CHECKS) -> list[Ch
             r.name,
             r.detail,
         )
-    for column, pct in null_percentages(con).items():
-        if pct > 0:
-            log.info("NULL %-30s %5.1f%%", column, pct)
+    for table in (TABLE, WEATHER_TABLE):
+        if not _table_exists(con, table):
+            continue
+        for column, pct in null_percentages(con, table).items():
+            if pct > 0:
+                log.info("NULL %-22s %-20s %5.1f%%", table, column, pct)
     return results
 
 
@@ -187,7 +269,7 @@ def assert_quality(con: duckdb.DuckDBPyConnection, checks=SERVICE_CHECKS) -> Non
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     with duckdb.connect(str(DB_PATH), read_only=True) as con:
-        assert_quality(con, SERVICE_CHECKS + STATION_CHECKS)
+        assert_quality(con, ALL_CHECKS)
 
 
 if __name__ == "__main__":

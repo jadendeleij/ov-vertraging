@@ -1,0 +1,35 @@
+version: 2
+
+models:
+  - name: int_station_weather_map
+    description: >
+      Elk treinstation met per weervariabele (temperatuur, neerslag, wind, zicht) het
+      dichtstbijzijnde KNMI-station dat die variabele meet, via haversine-afstand.
+      Verder dan var weather_max_distance_km (50 km) = NULL.
+    columns:
+      - name: station_code
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_stations')
+                field: station_code
+      - name: temperature_station_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_weather_stations')
+                field: weather_station_id
+      - name: temperature_distance_km
+        data_tests:
+          - not_null
+          - value_between:
+              arguments: {min_value: 0, max_value: 2000}
+
+  - name: int_departures_with_weather
+    description: >
+      Eén rij per treinvertrek (alleen echte treinen), met volgend station
+      (route_code = van-naar) en het weer van het UTC-uur van de geplande vertrektijd.
+      View: de tests staan op fct_departures (zelfde rijen), want elke test op deze
+      view rekent alle joins opnieuw uit.
