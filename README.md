@@ -23,6 +23,7 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 pytest
 python -m ov_vertraging.download --start 2025-11 --end 2026-10 --stations
+python -m ov_vertraging.download_weather --start 2025-11 --end 2026-10
 python -m ov_vertraging.load
 ```
 
@@ -38,11 +39,36 @@ Treinarchief van Rijden de Treinen, november 2025 t/m oktober 2026 (12 maanden):
 | Rijen in `raw.services` | 22.521.886 stops van 2.397.288 ritten |
 | Downloadtijd | ~13 s |
 | Laadtijd in DuckDB (incl. kwaliteitschecks) | ~11 s, piekgeheugen ~1,6 GB |
-| Grootte `data/ov.duckdb` | 498 MB |
+| Grootte `data/ov.duckdb` | 498 MB na eerste keer laden; stabiel ~920 MB bij herladen (zie hieronder) |
 | Vertrekken ≥ 5 min vertraagd | 4,3 % (hoogst in nov 2025: 6,0 %, laagst in jul 2026: 3,4 %) |
 | Stations in `raw.stations` | 591 (397 NL, 194 buitenland), met coördinaten en stationstype |
+| Weer in `raw.weather_hourly` | 402.960 uurrijen = 46 weerstations × 8.760 uur, geen enkel uur ontbrekend (42 MB ruw, ~15 s download) |
 
 Gemeten op een Mac met Apple Silicon. DuckDB leest de gzip-bestanden rechtstreeks; er gaan geen ruwe rijen door pandas.
+
+Over de bestandsgrootte: `CREATE OR REPLACE` maakt de oude tabel vrij, maar DuckDB geeft die ruimte niet terug aan het besturingssysteem. Bij de volgende run worden die vrije blokken hergebruikt, dus het bestand stabiliseert rond 2× de data en groeit niet onbeperkt.
+
+### Weerbron: waarom KNMI-uurgegevens
+
+We gebruiken de [KNMI-uurgegevensdienst](https://www.daggegevens.knmi.nl/klimatologie/uurgegevens): gevalideerde uurwaarden van alle automatische weerstations.
+
+| | KNMI-uurgegevens (gekozen) | KNMI Data Platform (hourly validated) |
+|---|---|---|
+| API-key | niet nodig | nodig |
+| Formaat | CSV, één request per maand voor alle stations | NetCDF-bestanden |
+| Stationscoördinaten | in de kop van het bestand | in de NetCDF-bestanden |
+| Actualiteit | ~2 dagen vertraging | ~1–2 dagen vertraging |
+
+De meetwaarden zijn dezelfde. De uurgegevensdienst is eenvoudiger en vereist geen secrets, wat ook CI makkelijker maakt. Risico: het is een oudere dienst. Als KNMI die uitzet, hoeft alleen [`download_weather.py`](src/ov_vertraging/download_weather.py) om naar het Data Platform.
+
+Variabelen per uur (in `raw` in bron-eenheden, omrekenen gebeurt in dbt staging): temperatuur, neerslag, gemiddelde wind, windstoten, windrichting, zicht, luchtvochtigheid, bewolking, zonneschijn, en vlaggen voor mist, sneeuw, onweer en ijsvorming.
+
+Valkuilen in deze bron, afgevangen in code en tests:
+- Uren lopen van 1 t/m 24 in **UTC**: uur 5 = 04:00–05:00 UTC. Treintijden zijn Nederlandse tijd, dus de koppeling moet omrekenen (zomer-/wintertijd!).
+- Veel waarden zijn in **tienden** (0,1 °C, 0,1 mm, 0,1 m/s); neerslag `-1` betekent < 0,05 mm (droog).
+- Met een einde op uur 24 levert KNMI ook de **volgende dag** mee; de loader filtert per bestand op de eigen maand.
+- Niet elk station meet alles: ~26 % van de uren heeft geen temperatuur (zee- en windstations). De koppeling trein → weerstation moet per variabele een station kiezen dat die variabele meet.
+- De weercode (`WW`) levert deze dienst voor geen enkel station; die is daarom niet opgenomen.
 
 Het stationsbestand (`stations-2023-09.csv`) is de nieuwste versie van Rijden de Treinen. We gebruiken de variant mét buitenlandse stations, omdat het treinarchief ook ritten naar Duitsland en België bevat. 99,8 % van alle stops koppelt aan een station; de rest zijn metrohaltes bij vervangend vervoer en enkele buitenlandse stations.
 
@@ -51,6 +77,7 @@ Het stationsbestand (`stations-2023-09.csv`) is de nieuwste versie van Rijden de
 Bij elke laadronde draait [`quality.py`](src/ov_vertraging/quality.py). Faalt er één check, dan stopt de pipeline.
 - `raw.services`: rijen > 0, `stop_id` uniek, sleutelkolommen niet NULL, elke rit ≥ 2 stops, vertraging binnen [−5, 600] min (max 0,1 % uitschieters).
 - `raw.stations`: rijen > 0, `station_code` uniek, coördinaten binnen Europa, ≥ 99 % van de stops heeft een bekend station.
+- `raw.weather_*`: rijen > 0, (station, datum, uur) uniek, uur tussen 1 en 24, temperatuur en windstoten plausibel, elk weerstation heeft coördinaten.
 
 Bekende eigenaardigheden van de bron:
 - Een handvol DB-treinen (Duitsland) heeft precies ~1440 min vertraging: een datumfout van 24 uur. Dat is 0,007 % van de rijen; ze worden in de staging-laag weggefilterd.
@@ -62,6 +89,7 @@ Bekende eigenaardigheden van de bron:
 
 - Treindata: [Rijden de Treinen – treinarchief](https://www.rijdendetreinen.nl/open-data/treinarchief), licentie [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 - Stations: [Rijden de Treinen – stations](https://www.rijdendetreinen.nl/open-data/stations), licentie [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- Weer: [KNMI – uurgegevens van het weer in Nederland](https://www.knmi.nl/nederland-nu/klimatologie/uurgegevens), bron: Koninklijk Nederlands Meteorologisch Instituut (KNMI).
 
 ## Licentie
 

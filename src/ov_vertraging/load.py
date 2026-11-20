@@ -1,4 +1,4 @@
-"""Laad de maandbestanden in raw.services en het stationsbestand in raw.stations.
+"""Laad treinarchief (raw.services), stations (raw.stations) en weer (raw.weather_*).
 
 Gebruik:
     python -m ov_vertraging.load
@@ -27,7 +27,8 @@ from ov_vertraging.config import (
     TIMEZONE,
     TYPES,
 )
-from ov_vertraging.quality import SERVICE_CHECKS, STATION_CHECKS, assert_quality
+from ov_vertraging.load_weather import load_weather
+from ov_vertraging.quality import ALL_CHECKS, assert_quality
 
 log = logging.getLogger(__name__)
 
@@ -136,8 +137,9 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     load_services()
     load_stations()
+    load_weather()
     with duckdb.connect(str(DB_PATH), read_only=True) as con:
-        assert_quality(con, SERVICE_CHECKS + STATION_CHECKS)
+        assert_quality(con, ALL_CHECKS)
     summarize()
 
 

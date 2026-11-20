@@ -1,4 +1,4 @@
-"""Centrale instellingen: paden, URL's en het kolomschema van het treinarchief."""
+"""Centrale instellingen: paden, URL's en kolomschema's van treinarchief, stations en weer."""
 
 from pathlib import Path
 
@@ -37,6 +37,35 @@ STATION_COLUMN_MAP: dict[str, tuple[str, str]] = {
 
 # Alle tijden in DuckDB tonen we in Nederlandse tijd.
 TIMEZONE = "Europe/Amsterdam"
+
+# KNMI uurgegevens (gevalideerde uurwaarden van alle automatische weerstations).
+# Gekozen boven het KNMI Data Platform: geen API-key, één request per maand voor
+# alle stations, CSV met stationscoördinaten in de kop. Zie README.
+WEATHER_DIR = RAW_DIR / "weather"
+WEATHER_URL = "https://www.daggegevens.knmi.nl/klimatologie/uurgegevens"
+WEATHER_FILENAME = "knmi-uur-{month}.txt"
+# Validated data loopt ~2 dagen achter; een maand is pas "definitief" als het
+# bestand minstens zoveel dagen na het einde van de maand is gedownload.
+WEATHER_LAG_DAYS = 3
+
+# KNMI-code -> omschrijving. In raw bewaren we de bronwaarden (veel in tienden);
+# omrekenen naar °C, mm en m/s gebeurt in de dbt-staginglaag.
+# Niet opgenomen: WW (weercode) — deze dienst levert die voor geen enkel station.
+WEATHER_VARS: dict[str, str] = {
+    "DD": "windrichting (graden; 0 = windstil, 990 = veranderlijk)",
+    "FH": "uurgemiddelde windsnelheid (0,1 m/s)",
+    "FX": "hoogste windstoot (0,1 m/s)",
+    "T": "temperatuur op 1,5 m (0,1 °C)",
+    "SQ": "zonneschijnduur (0,1 uur; -1 = < 0,05 uur)",
+    "RH": "neerslag uursom (0,1 mm; -1 = < 0,05 mm)",
+    "VV": "zicht (code: 0 = < 100 m ... 89 = > 70 km)",
+    "N": "bewolking (achtsten; 9 = bovenlucht onzichtbaar)",
+    "U": "relatieve vochtigheid (%)",
+    "M": "mist (0/1)",
+    "S": "sneeuw (0/1)",
+    "O": "onweer (0/1)",
+    "Y": "ijsvorming (0/1)",
+}
 
 # Originele kolomnaam in de CSV -> (nette naam in DuckDB, DuckDB-type).
 # Gecontroleerd tegen het echte bestand services-2026-10.csv.gz (header gelijk aan de docs).
