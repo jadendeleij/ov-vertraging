@@ -23,20 +23,16 @@ RED_SCALE = "YlOrRd"
 # ---------- data ----------
 
 
-@st.cache_resource
-def get_connection() -> duckdb.DuckDBPyConnection:
-    return duckdb.connect(str(DB_PATH), read_only=True)
-
-
-def con() -> duckdb.DuckDBPyConnection:
-    # Eigen cursor per aanroep: Streamlit draait sessies in verschillende threads.
-    return get_connection().cursor()
-
-
 @st.cache_data(ttl=3600, show_spinner=False)
 def cached(name: str, *args):
-    """Cache per query + filters, zodat terugklikken direct gaat."""
-    return getattr(dq, name)(con(), *args)
+    """Voer een query uit en cache het resultaat per query + filters.
+
+    Bewust een korte verbinding per query i.p.v. één die open blijft: DuckDB laat
+    geen schrijver toe zolang een ander proces het bestand open heeft. Zo kan de
+    dagelijkse Dagster-run de database bijwerken terwijl het dashboard draait.
+    """
+    with duckdb.connect(str(DB_PATH), read_only=True) as con:
+        return getattr(dq, name)(con, *args)
 
 
 if not DB_PATH.exists():
