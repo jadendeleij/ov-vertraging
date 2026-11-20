@@ -227,4 +227,4 @@ Werk dit bij na elke afgeronde taak (datum, wat gedaan, wat volgende stap).
   - Slechtste dagen: 5–7 jan 2026 (sneeuw/wissels, tot 50% uitval), 17–18 nov 2025 (koperdiefstal, defecte treinen; uit RDT-storingsarchief 2025), 9 sep 2026 landelijke OV-staking (92% uitval). Storingsarchief 2026 bestaat nog niet.
   - Gestapelde balken met verschillende noemers vermeden (vertraagd = van gereden treinen, uitval = van alle).
   - Streamlit laadt gewijzigde geïmporteerde modules niet altijd opnieuw → na wijziging in `dashboard_queries.py` het dashboard herstarten.
-  - Nog open: dashboard-screenshot (`docs/img/dashboard.png`, door jou), daarna PR.
+  - Dashboard-screenshot (door jou) in `docs/img/dashboard.png` en README. Branch gepusht en PR naar main geopend; mergen na jouw akkoord. Volgende stap: Fase 4 (model, branch `fase-4-model`).

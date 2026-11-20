@@ -76,6 +76,8 @@ jupyter notebook notebooks/01_verkenning.ipynb
 
 [`app/dashboard.py`](app/dashboard.py) laat iedereen de data verkennen zonder SQL. Filters op periode en treintype; vier tabbladen:
 
+![Dashboard: kaart van 396 Nederlandse stations gekleurd op % vertrekken ≥ 5 min vertraagd, met KPI's en de minst stipte stations](docs/img/dashboard.png)
+
 | Tabblad | Wat je ziet |
 |---|---|
 | 📊 Overzicht | KPI's (vertrekken, % ≥ 5 min vertraagd, % uitval, gem. vertraging), heatmap uur × weekdag, verloop per dag |
