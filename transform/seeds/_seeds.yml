@@ -1,0 +1,26 @@
+version: 2
+
+seeds:
+  - name: nl_public_holidays
+    description: >
+      Nederlandse feestdagen volgens de Algemene termijnenwet, berekend door
+      ov_vertraging.calendar_seeds (Pasen via het Meeus-algoritme). Goede Vrijdag en
+      Bevrijdingsdag staan erin, maar zijn voor veel mensen een werkdag.
+    columns:
+      - name: holiday_date
+        data_tests: [unique, not_null]
+
+  - name: nl_school_holidays
+    description: >
+      Schoolvakanties per regio (noord/midden/zuid) van de open data van de
+      Rijksoverheid. "Heel Nederland" is uitgeschreven naar de drie regio's.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [schoolyear, vacation_name, region]
+    columns:
+      - name: region
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [noord, midden, zuid]

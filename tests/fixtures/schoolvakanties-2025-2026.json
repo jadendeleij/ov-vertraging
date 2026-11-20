@@ -1,0 +1,42 @@
+{
+ "content": [
+  {
+   "title": "Overzicht schoolvakanties schooljaar 2025-2026",
+   "schoolyear": "\n              2025-2026 \n            ",
+   "vacations": [
+    {
+     "type": "\n                         Herfstvakantie \n                    ",
+     "compulsorydates": "false",
+     "regions": [
+      {
+       "region": "noord",
+       "startdate": "2025-10-18T00:00:00.000Z",
+       "enddate": "2025-10-26T22:59:00.000Z"
+      },
+      {
+       "region": "midden",
+       "startdate": "2025-10-18T00:00:00.000Z",
+       "enddate": "2025-10-26T22:59:00.000Z"
+      },
+      {
+       "region": "zuid",
+       "startdate": "2025-10-11T00:00:00.000Z",
+       "enddate": "2025-10-19T21:59:00.000Z"
+      }
+     ]
+    },
+    {
+     "type": "\n                         Kerstvakantie \n                    ",
+     "compulsorydates": "true",
+     "regions": [
+      {
+       "region": "heel Nederland",
+       "startdate": "2025-12-20T00:00:00.000Z",
+       "enddate": "2026-01-04T22:59:00.000Z"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

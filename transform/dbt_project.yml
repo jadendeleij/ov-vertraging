@@ -4,6 +4,7 @@ config-version: 2
 profile: ov_vertraging
 
 model-paths: ["models"]
+seed-paths: ["seeds"]
 macro-paths: ["macros"]
 test-paths: ["tests"]
 target-path: "target"
@@ -28,3 +29,14 @@ models:
     marts:
       +schema: marts
       +materialized: table
+
+# Kleine vaste tabellen uit CSV (gemaakt met python -m ov_vertraging.calendar_seeds).
+seeds:
+  ov_vertraging:
+    +schema: seeds
+    nl_public_holidays:
+      +column_types: {holiday_date: date, holiday_name: varchar}
+    nl_school_holidays:
+      +column_types:
+        {schoolyear: varchar, vacation_name: varchar, region: varchar,
+         start_date: date, end_date: date}

@@ -4,7 +4,7 @@
 
 with nl as (
     select d.*
-    from {{ ref('int_departures_with_weather') }} as d
+    from {{ ref('fct_departures') }} as d
     join {{ ref('stg_stations') }} as s using (station_code)
     where s.is_dutch
 ),

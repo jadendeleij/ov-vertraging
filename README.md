@@ -45,16 +45,29 @@ Het dbt-project staat in [`transform/`](transform/) en schrijft naar dezelfde Du
 | `stg_weather` | KNMI-codes naar °C, mm, m/s, Beaufort en meters zicht; begin van het uurvak in UTC en lokale tijd. |
 | `stg_weather_stations` | Weerstations met coördinaten en welke variabelen ze echt meten (34 van 51 meten temperatuur). |
 
-**Intermediate** (tabellen, koppelingen):
+**Intermediate** (koppelingen):
 
 | Model | Wat het doet |
 |---|---|
 | `int_station_weather_map` | Elk treinstation → per variabele (temperatuur, neerslag, wind, zicht) het dichtstbijzijnde KNMI-station dat die variabele echt meet, via de haversine-afstand. Gemiddeld 14 km, maximaal 36 km voor Nederlandse stations; > 50 km = geen weer. |
-| `int_departures_with_weather` | 19,6 mln treinvertrekken met volgend station (`route_code`, 2.979 trajecten) en het weer van dat uur; 97,5 % heeft een temperatuur. Volgorde van stops op geplande tijd, niet op `stop_id`: bij omleidingen krijgt een extra stop een later id. |
+| `int_departures_with_weather` | (view) 19,6 mln treinvertrekken met volgend station (`route_code`, 2.979 trajecten) en het weer van dat uur; 97,5 % heeft een temperatuur. Volgorde van stops op geplande tijd, niet op `stop_id`: bij omleidingen krijgt een extra stop een later id. Een view en geen tabel, zodat de 19,6 mln rijen niet twee keer op schijf staan. |
+
+**Marts** (tabellen voor dashboard en model):
+
+| Model | Wat het doet |
+|---|---|
+| `fct_departures` | Eén rij per treinvertrek met target `is_delayed_5min`, tijd, traject en weer (+ vlaggen `is_frost`, `is_wind_7bft`, `is_heavy_rain`). |
+| `dim_station` | 645 stations: het stationsbestand plus 54 stations uit het treinarchief die er niet in staan (vooral buitenland), met gekoppelde weerstations. |
+| `dim_date` | 366 dagen met weekdag, seizoen, feestdagen en schoolvakanties per regio (noord/midden/zuid). |
+| `agg_route_hour` | Punctualiteit per traject × uur × weekdag (205.621 rijen): % ≥ 5 min, % geannuleerd, gemiddelde en p90-vertraging. |
+
+**Target `is_delayed_5min`**: `true` = vertrokken met ≥ 5 min vertraging, `false` = < 5 min, `NULL` = geannuleerd of vertraging onbekend. Het model voorspelt dus *"als de trein rijdt, wat is de kans op ≥ 5 min vertraging?"*; annuleringen (6,0 % van de vertrekken) zijn een apart cijfer, zoals NS dat ook rapporteert. Van de 18,45 mln vertrekken met een target is 4,64 % vertraagd.
+
+**Seeds**: feestdagen (berekend, Pasen via het Meeus-algoritme) en schoolvakanties (open data Rijksoverheid) staan als kleine CSV's in [`transform/seeds/`](transform/seeds/), gemaakt met `python -m ov_vertraging.calendar_seeds --years 2025 2026`. Zo draait `dbt build` zonder internet.
 
 **Waarom koppelen op UTC?** Bij de overgang naar wintertijd (25 oktober 2026) komt lokaal 02:00 twee keer voor. Een koppeling op Nederlandse tijd zou dan elk vertrek aan twee weeruren hangen. In UTC is elk uur uniek. Een eigen dbt-test ([`assert_weather_dst_switch`](transform/tests/assert_weather_dst_switch.sql)) bewaakt dit.
 
-**Tests**: 52 in totaal (`dbt build` ~1 min): `unique`/`not_null` op sleutels, `accepted_values` op treintype, `relationships` tussen weer en weerstations, en eigen tests: [`value_between`](transform/tests/generic/value_between.sql) (bv. vertraging tussen −5 en 600 min), [`unique_combination`](transform/tests/generic/unique_combination.sql) (station × uur) twee tijdzonetests en een weerdekkingstest (≥ 95 % van de NL-vertrekken heeft weer).
+**Tests**: 77 in totaal (`dbt build` ~20 s): `unique`/`not_null` op sleutels, `accepted_values` op treintype en regio, `relationships` tussen `fct_departures` en de dimensies, en eigen tests: [`value_between`](transform/tests/generic/value_between.sql) (bv. vertraging tussen −5 en 600 min), [`unique_combination`](transform/tests/generic/unique_combination.sql) (station × uur), twee tijdzonetests, een weerdekkingstest (≥ 95 % van de NL-vertrekken heeft weer), een test op de exacte targetdefinitie en een steekproef van bekende dagen in `dim_date`.
 
 ## Data
 

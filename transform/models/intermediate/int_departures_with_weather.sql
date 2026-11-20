@@ -1,3 +1,7 @@
+-- View i.p.v. tabel: alleen fct_departures leest dit model, en als tabel zou dezelfde
+-- 19,6 mln rijen twee keer op schijf staan (~1 GB extra).
+{{ config(materialized='view') }}
+
 -- Eén rij per treinvertrek (stop met een vertrektijd, alleen echte treinen),
 -- met het volgende station (zodat een traject ontstaat) en het weer van dat uur.
 --

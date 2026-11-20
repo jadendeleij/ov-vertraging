@@ -31,26 +31,5 @@ models:
     description: >
       Eén rij per treinvertrek (alleen echte treinen), met volgend station
       (route_code = van-naar) en het weer van het UTC-uur van de geplande vertrektijd.
-    columns:
-      - name: stop_id
-        data_tests: [unique, not_null]
-      - name: next_station_code
-        description: Volgende stop van dezelfde rit, op geplande tijd geordend.
-        data_tests: [not_null]
-      - name: route_code
-        data_tests: [not_null]
-      - name: station_code
-        description: >
-          ~0,2 % van de vertrekken is vanaf een station dat niet in het stationsbestand
-          (2023) staat, vooral in het buitenland. Daarom een waarschuwing, geen fout.
-        data_tests:
-          - relationships:
-              arguments:
-                to: ref('stg_stations')
-                field: station_code
-              config:
-                severity: warn
-      - name: departure_delay_min
-        data_tests:
-          - value_between:
-              arguments: {min_value: -5, max_value: 600}
+      View: de tests staan op fct_departures (zelfde rijen), want elke test op deze
+      view rekent alle joins opnieuw uit.
