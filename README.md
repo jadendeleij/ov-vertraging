@@ -6,7 +6,7 @@ Voorspelt de kans dat een trein in Nederland ≥ 5 minuten vertraging heeft bij 
 
 ## Roadmap
 
-- [ ] Fase 1 – Data binnenhalen (treinarchief → DuckDB)
+- [x] Fase 1 – Data binnenhalen (treinarchief + stations → DuckDB, kwaliteitschecks)
 - [ ] Fase 2 – Datapipeline (KNMI-weer, dbt, Dagster)
 - [ ] Fase 3 – Analyse & dashboard
 - [ ] Fase 4 – Model (LightGBM)
@@ -62,3 +62,7 @@ Bekende eigenaardigheden van de bron:
 
 - Treindata: [Rijden de Treinen – treinarchief](https://www.rijdendetreinen.nl/open-data/treinarchief), licentie [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 - Stations: [Rijden de Treinen – stations](https://www.rijdendetreinen.nl/open-data/stations), licentie [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
+## Licentie
+
+De code valt onder de [MIT-licentie](LICENSE). De data valt onder de licenties van de bronnen hierboven.
