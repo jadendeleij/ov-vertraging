@@ -4,7 +4,7 @@
     {
       "name": "dagster",
       "runtimeExecutable": "bash",
-      "runtimeArgs": ["-c", "mkdir -p .dagster_home && DAGSTER_HOME=$PWD/.dagster_home .venv/bin/dagster dev -p 3000"],
+      "runtimeArgs": ["-c", "mkdir -p .dagster_home && DAGSTER_HOME=$PWD/.dagster_home .venv/bin/dagster dev -p ${PORT:-3000}"],
       "port": 3000
     }
   ]

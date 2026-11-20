@@ -59,6 +59,8 @@ Windows (PowerShell): gelijk, maar activeer met `.venv\Scripts\Activate.ps1` en 
 
 [`orchestration/definitions.py`](orchestration/definitions.py) beschrijft de hele pipeline als **assets**: dingen die bestaan en ververst kunnen worden (een bestand, een tabel), met hun afhankelijkheden. Dagster leidt daaruit de volgorde af en toont de lineage.
 
+![Dagster-lineage: alle 19 assets van download via raw, staging en intermediate naar marts, na een geslaagde run](docs/img/dagster-lineage.png)
+
 | Groep | Assets | Wat er gebeurt |
 |---|---|---|
 | `download` | `services_files`, `stations_file`, `weather_files` | Nieuwe maanden ophalen. Standaard de vorige en de huidige maand; een maand die nog niet gepubliceerd is (HTTP 404) wordt overgeslagen. |
