@@ -1,0 +1,28 @@
+# API + dashboard samen lokaal:
+#   python -m ov_vertraging.serving.export   # maakt models/serving (eenmalig)
+#   docker compose up --build
+# Dashboard: http://localhost:8501   API-documentatie: http://localhost:8000/docs
+services:
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env          # NS_API_KEY (optioneel; zonder key werkt /departures niet)
+        required: false
+    volumes:
+      - ./models/serving:/app/models/serving:ro
+
+  app:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      API_URL: http://api:8000   # containers vinden elkaar op servicenaam
+    depends_on:
+      api:
+        condition: service_healthy

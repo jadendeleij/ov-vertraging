@@ -4,14 +4,38 @@
     {
       "name": "dagster",
       "runtimeExecutable": "bash",
-      "runtimeArgs": ["-c", "mkdir -p .dagster_home && DAGSTER_HOME=$PWD/.dagster_home .venv/bin/dagster dev -p ${PORT:-3000}"],
+      "runtimeArgs": [
+        "-c",
+        "mkdir -p .dagster_home && DAGSTER_HOME=$PWD/.dagster_home .venv/bin/dagster dev -p ${PORT:-3000}"
+      ],
       "port": 3000
     },
     {
       "name": "dashboard",
       "runtimeExecutable": "bash",
-      "runtimeArgs": ["-c", ".venv/bin/streamlit run app/dashboard.py --server.headless true --server.port ${PORT:-8501}"],
+      "runtimeArgs": [
+        "-c",
+        ".venv/bin/streamlit run app/dashboard.py --server.headless true --server.port ${PORT:-8501}"
+      ],
       "port": 8501
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        ".venv/bin/uvicorn api.main:app --port ${PORT:-8000}"
+      ],
+      "port": 8000
+    },
+    {
+      "name": "dashboard-online",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "OV_DUCKDB_PATH=/tmp/bestaat-niet.duckdb .venv/bin/streamlit run app/dashboard.py --server.headless true --server.port ${PORT:-8502}"
+      ],
+      "port": 8502
     }
   ]
 }

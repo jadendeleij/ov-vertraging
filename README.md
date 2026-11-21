@@ -1,5 +1,7 @@
 # OV-vertragingsvoorspeller
 
+[![CI](https://github.com/jadendeleij/ov-vertraging/actions/workflows/ci.yml/badge.svg)](https://github.com/jadendeleij/ov-vertraging/actions/workflows/ci.yml)
+
 Voorspelt de kans dat een trein in Nederland ≥ 5 minuten vertraging heeft bij vertrek, op basis van historische treindata en het weer.
 
 > 🚧 In aanbouw — zie de roadmap hieronder.
@@ -45,6 +47,40 @@ Voorspelt per vertrek de kans op ≥ 5 min vertraging, een paar uur vóór vertr
 
 Trainen (≈ 20 min, 8 GB RAM is genoeg): `python -m ov_vertraging.model.train`
 
+## Live API en web-app
+
+Het model draait achter een **FastAPI** ([`api/main.py`](api/main.py)) op een slanke export van 8 MB ([`serving/export.py`](src/ov_vertraging/serving/export.py)) in plaats van de database van 3 GB:
+
+| Endpoint | Wat het doet |
+|---|---|
+| `POST /predict` | Van-station, naar-station en vertrektijd → de eerste directe trein, de kans op ≥ 5 min vertraging, risiconiveau, de 3 belangrijkste factoren in gewone taal en de weersverwachting |
+| `GET /departures/{station}` | Live vertrekken van de **NS**, met per trein de voorspelde kans (en de actuele vertraging volgens NS ter vergelijking) |
+| `GET /stations`, `GET /health` | Stationslijst en status |
+
+- **Weersverwachting:** het KNMI-model HARMONIE via [Open-Meteo](https://open-meteo.com/en/docs/knmi-api), omgezet naar dezelfde features als in de training.
+- **Uitleg:** per voorspelling de SHAP-bijdragen van LightGBM, bv. *"dit traject op dit uur was eerder 7 % van de keren vertraagd — verhoogt de kans"*.
+- Het Streamlit-dashboard heeft de tabbladen **Voorspel mijn reis** en **Live vertrekken**, die de API aanroepen. Zonder database (online) toont het alleen die twee.
+
+```bash
+python -m ov_vertraging.serving.export      # maakt models/serving (na het trainen)
+uvicorn api.main:app                        # http://localhost:8000/docs
+streamlit run app/dashboard.py              # http://localhost:8501
+```
+
+Voor `/departures` is een gratis NS-key nodig (apiportal.ns.nl, product "Ns-App") in `.env`; zie [`.env.example`](.env.example).
+
+### Docker
+
+```bash
+docker compose up --build                   # API op :8000, dashboard op :8501
+```
+
+Twee slanke images ([`api/Dockerfile`](api/Dockerfile), [`app/Dockerfile`](app/Dockerfile)): Python 3.12-slim, alleen de benodigde dependencies (de API-image bevat geen dbt, Dagster of MLflow), draaien niet als root, met healthchecks.
+
+### CI
+
+[GitHub Actions](.github/workflows/ci.yml) draait bij elke push: ruff, pytest, de **volledige pipeline + `dbt build` op een meegeleverde voorbeelddataset** ([`tests/fixtures/sample`](tests/fixtures/sample), 627 KB echte data, gemaakt met `python -m ov_vertraging.sample`) en het bouwen + starten van beide Docker-images.
+
 ## Architectuur
 
 ```
@@ -54,7 +90,7 @@ Rijden de Treinen ──┐
   stations          │                  + 14 checks      (views)     (koppelingen)    (tabellen)
 KNMI uurweer ───────┘
 Feestdagen + schoolvakanties ─────────────────────────► seeds ──────┘
-                         Dagster draait dit elke dag om 07:00 · 69 asset checks + 67 tests
+                         Dagster draait dit elke dag om 07:00 · 69 asset checks + 101 tests
 ```
 
 ## Zelf draaien
@@ -64,7 +100,7 @@ Vereist Python 3.11–3.13 (dagster-dbt ondersteunt 3.14 nog niet). macOS / Linu
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev]"        # alles; of alleen .[api], .[app], .[pipeline], .[model]
 pytest
 ```
 

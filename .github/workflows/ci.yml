@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "fase-*"]
+  pull_request:
+    branches: [main]
+
+# Alleen lezen: deze workflow pusht en publiceert niets.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint, tests en dbt build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Dependencies installeren
+        run: pip install -e ".[dev]"
+
+      - name: Ruff (lint en opmaak)
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Pytest
+        run: pytest -q
+
+      - name: Pipeline op de voorbeelddataset (load + 14 kwaliteitschecks)
+        env:
+          OV_RAW_DIR: tests/fixtures/sample
+          OV_DUCKDB_PATH: ${{ runner.temp }}/ci.duckdb
+        run: python -m ov_vertraging.load
+
+      - name: dbt build (alle modellen en tests)
+        working-directory: transform
+        env:
+          OV_DUCKDB_PATH: ${{ runner.temp }}/ci.duckdb
+        run: dbt build
+
+  docker:
+    name: Docker-images bouwen
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: API-image bouwen
+        run: docker build -f api/Dockerfile -t ov-api .
+
+      - name: API start en voorspelt (model uit de GitHub Release)
+        run: |
+          docker run -d --name api -p 8000:8000 ov-api
+          for i in $(seq 1 30); do
+            curl -fs http://localhost:8000/health && break
+            sleep 2
+          done
+          curl -fs -X POST http://localhost:8000/predict \
+            -H 'Content-Type: application/json' \
+            -d '{"from_station":"Utrecht Centraal","to_station":"Amsterdam Centraal","departure_time":"2026-11-24T08:00"}' \
+            | tee predict.json
+          python3 -c "import json; r=json.load(open('predict.json')); assert 0 < r['probability'] < 1, r"
+          docker stats --no-stream --format 'API-geheugen: {{.MemUsage}}' api
+
+      - name: Dashboard-image bouwen
+        run: docker build -f app/Dockerfile -t ov-app .
+
+      - name: Dashboard start en is gezond
+        run: |
+          docker run -d --name app -p 8501:8501 ov-app
+          for i in $(seq 1 30); do
+            curl -fs http://localhost:8501/_stcore/health && exit 0
+            sleep 2
+          done
+          docker logs app
+          exit 1
