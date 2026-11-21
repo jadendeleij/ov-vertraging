@@ -45,6 +45,7 @@ NS_PAYLOAD = {
             {
                 "direction": "Rotterdam Centraal",
                 "plannedDateTime": "2026-11-23T17:19:00+0100",
+                "actualDateTime": "2026-11-23T17:23:00+0100",
                 "plannedTrack": "2",
                 "cancelled": False,
                 "product": {"number": "2358", "categoryCode": "IC", "operatorName": "NS"},
@@ -236,6 +237,7 @@ def test_departures_met_ns(predictor):
     assert body["station"]["name"] == "Bergen op Zoom"
     assert first["train_number"] == 2358 and first["type"] == "Intercity"
     assert 0 < first["probability"] < 1
+    assert first["current_delay_min"] == 4
     assert cancelled["cancelled"] is True and cancelled["probability"] is None
 
 

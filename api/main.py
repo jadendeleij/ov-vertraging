@@ -91,6 +91,11 @@ class LiveDeparture(BaseModel):
     direction: str | None
     planned_departure: datetime | None
     planned_track: str | None
+    actual_departure: datetime | None = Field(
+        None,
+        description="Actuele verwachte vertrektijd volgens NS (live, niet gebruikt door het model)",
+    )
+    current_delay_min: int | None = Field(None, description="Actuele vertraging volgens NS")
     cancelled: bool
     probability: float | None
     risk_level: str | None
@@ -103,6 +108,12 @@ class DeparturesResponse(BaseModel):
     attribution: str = ATTRIBUTION
 
 
+def _delay_min(planned: datetime | None, actual: datetime | None) -> int | None:
+    if planned is None or actual is None:
+        return None
+    return round((actual - planned).total_seconds() / 60)
+
+
 # ---------- app ----------
 
 
@@ -111,7 +122,7 @@ def create_app(predictor: Predictor | None = None, ns: NSClient | None = None) -
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        load_dotenv()
+        load_dotenv(PROJECT_ROOT / ".env")
         serving_dir = Path(os.getenv("SERVING_DIR", PROJECT_ROOT / "models" / "serving"))
         app.state.predictor = predictor or Predictor(serving_dir, OpenMeteoClient())
         app.state.ns = ns or NSClient(os.getenv("NS_API_KEY"))
@@ -249,6 +260,8 @@ def create_app(predictor: Predictor | None = None, ns: NSClient | None = None) -
                     direction=d["direction"],
                     planned_departure=d["planned"],
                     planned_track=d["planned_track"],
+                    actual_departure=d["actual"],
+                    current_delay_min=_delay_min(d["planned"], d["actual"]),
                     cancelled=d["cancelled"],
                     probability=preds[i]["probability"] if i in preds else None,
                     risk_level=preds[i]["risk_level"] if i in preds else None,

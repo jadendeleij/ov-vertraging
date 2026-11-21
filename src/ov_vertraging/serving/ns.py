@@ -49,13 +49,19 @@ def parse_departures(payload: dict, uic_to_code: dict[str, str]) -> list[dict]:
                 ),
                 "company": product.get("operatorName"),
                 "direction": dep.get("direction"),
-                "planned": datetime.strptime(planned, "%Y-%m-%dT%H:%M:%S%z") if planned else None,
+                "planned": _ts(planned),
+                # Live informatie, alleen om te tonen. NIET als modelfeature: dat zou leakage zijn.
+                "actual": _ts(dep.get("actualDateTime")),
                 "planned_track": dep.get("plannedTrack"),
                 "cancelled": bool(dep.get("cancelled", False)),
                 "next_station_code": uic_to_code.get(next_uic) if next_uic else None,
             }
         )
     return out
+
+
+def _ts(value: str | None) -> datetime | None:
+    return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S%z") if value else None
 
 
 def _int(value) -> int | None:

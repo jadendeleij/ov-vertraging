@@ -247,3 +247,4 @@ Werk dit bij na elke afgeronde taak (datum, wat gedaan, wat volgende stap).
   - SHAP-factoren zijn t.o.v. het modelgemiddelde (2,7%), niet het historische 4,1% → risiconiveau ook t.o.v. modelgemiddelde, anders spreken niveau en uitleg elkaar tegen.
   - `.env.example`: KNMI_API_KEY weg (niet gebruikt), SERVING_DIR toegevoegd.
   - Volgende stap: NS-antwoord verifiëren, Streamlit-tab "Voorspel mijn reis", Docker + compose, CI, Render, monitoring.
+- 2026-11-21 — NS-key staat in `.env` (gitignored; nooit getoond). Echt NS-antwoord geverifieerd: v2, `payload.departures[]` met `product.number/categoryCode/operatorName`, `routeStations[].uicCode`, `plannedDateTime`, `actualDateTime` — parser klopte. `/departures` live getest (BGN 6, UT 24 vertrekken). Toegevoegd: `actual_departure` en `current_delay_min` (alleen tonen, geen feature = geen leakage). `load_dotenv` met expliciet pad.
