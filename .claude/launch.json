@@ -12,6 +12,12 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": ["-c", ".venv/bin/streamlit run app/dashboard.py --server.headless true --server.port ${PORT:-8501}"],
       "port": 8501
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", ".venv/bin/uvicorn api.main:app --port ${PORT:-8000}"],
+      "port": 8000
     }
   ]
 }

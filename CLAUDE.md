@@ -242,3 +242,8 @@ Werk dit bij na elke afgeronde taak (datum, wat gedaan, wat volgende stap).
   - **Hosting:** Render free (512 MB RAM per dienst, 750 uur/maand, slaapt na 15 min, ~1 min opstarten). Database (3 GB) past niet → slanke serving-export (Parquet, enkele MB) met model, historie-lookups en dienstregeling-tellingen.
   - **NS API-key:** jij vraagt hem aan op apiportal.ns.nl en zet hem in `.env` als `NS_API_KEY` (nooit in chat of git).
   - Volgende stap: serving-export + FastAPI (`/health`, `/predict`, `/departures/{station}`) met TestClient-tests.
+- 2026-11-21 — API gebouwd: `ov_vertraging/serving/` (`export.py` → `models/serving/`, 8,4 MB incl. model, 3 s; `weather.py` Open-Meteo KNMI met cache; `ns.py` NS v2 departures met 60 s cache; `predictor.py` trein zoeken in dienstregeling van laatste 7 dagen, features zoals in training, kans + top-3 SHAP-factoren in het Nederlands) en `api/main.py` (FastAPI: `/health`, `POST /predict`, `GET /departures/{station}`, `/docs`). 11 API-tests met mini-export, mini-model, nep-weer en nep-NS. 94 tests groen. Lokaal getest met echte export en echte weersverwachting.
+  - NS: v2-endpoint bestaat (401 zonder key), v3 niet (404). Antwoordformaat nog verifiëren zodra `NS_API_KEY` in `.env` staat.
+  - SHAP-factoren zijn t.o.v. het modelgemiddelde (2,7%), niet het historische 4,1% → risiconiveau ook t.o.v. modelgemiddelde, anders spreken niveau en uitleg elkaar tegen.
+  - `.env.example`: KNMI_API_KEY weg (niet gebruikt), SERVING_DIR toegevoegd.
+  - Volgende stap: NS-antwoord verifiëren, Streamlit-tab "Voorspel mijn reis", Docker + compose, CI, Render, monitoring.
