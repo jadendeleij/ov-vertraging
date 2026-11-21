@@ -6,8 +6,8 @@
 
 **Komt mijn trein op tijd?** Een end-to-end data- en ML-project dat met een jaar Nederlandse treindata (22,5 mln stops) en het KNMI-weer voorspelt hoe groot de kans is dat een trein ≥ 5 minuten te laat vertrekt — van ruwe bestanden tot een live web-app.
 
-**🌐 Probeer het live:** [ov-vertraging-app.onrender.com](https://ov-vertraging-app.onrender.com) · [API-documentatie](https://ov-vertraging-api.onrender.com/docs)
-<sub>Gratis hosting: na 15 minuten zonder bezoek slaapt de app; het eerste bezoek duurt dan ~1 minuut.</sub>
+**🌐 Probeer het live:** [ov-vertraging-api.onrender.com](https://ov-vertraging-api.onrender.com) · [API-documentatie](https://ov-vertraging-api.onrender.com/docs)
+<sub>Gratis hosting: na 15 minuten zonder bezoek slaapt de site; het eerste bezoek duurt dan ~1 minuut.</sub>
 
 ![Demo: reis kiezen, voorspelling met uitleg en weer, daarna live NS-vertrekken met per trein de kans](docs/img/demo.gif)
 
@@ -16,19 +16,19 @@
 - **Datapipeline** — downloadt treinarchief, stations en uurweer, laadt alles in DuckDB met 14 kwaliteitschecks, transformeert met dbt (77 tests) en draait dagelijks via Dagster.
 - **Analyse** — een [notebook](notebooks/01_verkenning.ipynb) en een Streamlit-dashboard met kaart, heatmap, weereffecten en stiptheid per traject.
 - **Model** — LightGBM, eerlijk getest op maanden die het nooit zag, met uitleg per voorspelling (SHAP).
-- **Live** — FastAPI + Streamlit in Docker op Render: voorspel je reis met de KNMI-weersverwachting, of bekijk live NS-vertrekken met per trein de kans.
+- **Live** — een eigen website (HTML/CSS/JS, geen framework) en FastAPI in één Docker-dienst op Render: voorspel je reis met de KNMI-weersverwachting, bekijk het live vertrekbord met per trein de kans, of verken de inzichten.
 - **Productierijp** — CI op elke push, slanke images, monitoring die laat zien wanneer het model opnieuw getraind moet worden.
 
 ## Architectuur
 
-![Architectuur: bronnen → Python/DuckDB → dbt → analyse, model en monitoring; model geëxporteerd naar FastAPI en Streamlit op Render](docs/img/architectuur.svg)
+![Architectuur: bronnen → Python/DuckDB → dbt → analyse, model en monitoring; model geëxporteerd naar FastAPI met de website op Render](docs/img/architectuur.svg)
 
 ## In cijfers
 
 | | |
 |---|---|
 | Data | **22,5 mln** treinstops (2,4 mln ritten, nov 2025 – okt 2026) · **402.960** uur KNMI-weer · 591 stations |
-| Kwaliteit | **14** datakwaliteitschecks · **77** dbt-tests · **110** pytest-tests · **70** Dagster asset checks |
+| Kwaliteit | **14** datakwaliteitschecks · **77** dbt-tests · **115** pytest-tests · **70** Dagster asset checks |
 | Model | vindt vertragingen **2,5×** zo goed als gokken; de 10 % riskantste vertrekken bevatten **28 %** van alle vertragingen |
 | Live | export van **8 MB** in plaats van een database van 3 GB · API ~180 MB geheugen · CI in ~1,5 min |
 
@@ -69,7 +69,7 @@ Voorspelt per vertrek de kans op ≥ 5 min vertraging, een paar uur vóór vertr
 | Orkestratie | Dagster + dagster-dbt: 22 assets, dagelijks schema, blokkerende asset checks |
 | Analyse | Jupyter, pandas, matplotlib, Streamlit, Plotly |
 | Model | LightGBM, scikit-learn, SHAP, MLflow |
-| Live | FastAPI, Open-Meteo (KNMI-verwachting), NS Reisinformatie API |
+| Live | FastAPI, eigen website (HTML/CSS/JavaScript), Open-Meteo (KNMI-verwachting), NS Reisinformatie API |
 | Kwaliteit & deploy | pytest, ruff, GitHub Actions, Docker, Render (Blueprint) |
 
 ## Zelf draaien
@@ -96,7 +96,7 @@ Model, live app en dashboard:
 ```bash
 python -m ov_vertraging.model.train                # ~20 min op 8 GB RAM
 python -m ov_vertraging.serving.export             # slanke export voor de API
-uvicorn api.main:app                               # http://localhost:8000/docs
+uvicorn api.main:app                               # website http://localhost:8000, API /docs
 streamlit run app/dashboard.py                     # http://localhost:8501
 docker compose up --build                          # of beide in containers
 ```
@@ -107,7 +107,7 @@ Voor live NS-vertrekken: gratis key van [apiportal.ns.nl](https://apiportal.ns.n
 
 - [`docs/pipeline.md`](docs/pipeline.md) — Dagster, waarom drie dbt-lagen, idempotentie, alle modellen, de data en hun valkuilen
 - [`docs/model.md`](docs/model.md) — probleemdefinitie, features, leakage, resultaten, foutanalyse
-- [`docs/live.md`](docs/live.md) — API, dashboard, Docker, CI en monitoring
+- [`docs/live.md`](docs/live.md) — website, API, dashboard, Docker, CI en monitoring
 - [`notebooks/01_verkenning.ipynb`](notebooks/01_verkenning.ipynb) — de analyse met grafieken
 
 **Hoe het gebouwd is:** in zes fasen, elk via een pull request met uitleg en bevindingen: [data binnenhalen](https://github.com/jadendeleij/ov-vertraging/commits/main) · [pipeline](https://github.com/jadendeleij/ov-vertraging/pull/1) · [analyse & dashboard](https://github.com/jadendeleij/ov-vertraging/pull/2) · [model](https://github.com/jadendeleij/ov-vertraging/pull/3) · [live](https://github.com/jadendeleij/ov-vertraging/pull/4) · [monitoring](https://github.com/jadendeleij/ov-vertraging/pull/6).

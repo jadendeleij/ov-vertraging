@@ -5,11 +5,14 @@ Starten (vanuit de projectroot, na `python -m ov_vertraging.serving.export`):
 Documentatie (interactief): http://localhost:8000/docs
 
 Endpoints:
+    GET  /                        de website (web/: HTML, CSS en JavaScript)
     GET  /health                  status, modelversie, datum van de data
-    POST /predict                 {van, naar, vertrektijd} -> trein + kans + uitleg
+    GET  /stations                stations voor de zoekvelden
+    POST /predict                 {van, naar, vertrektijd} -> trein + kans + uitleg + alternatieven
     GET  /departures/{station}    live NS-vertrekken met per trein de kans (NS_API_KEY nodig)
+    GET  /insights                KPI's, kaart, heatmap en weer (filters: periode, treintype)
 
-Omgevingsvariabelen: SERVING_DIR (standaard models/serving), NS_API_KEY.
+Omgevingsvariabelen: SERVING_DIR (standaard models/serving), NS_API_KEY, WEB_DIR.
 """
 
 import logging
@@ -21,15 +24,19 @@ from typing import Annotated
 
 import requests
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from ov_vertraging.config import PROJECT_ROOT
+from ov_vertraging.serving import insights as insights_mod
 from ov_vertraging.serving.ns import NSClient, NSNotConfigured, parse_departures
 from ov_vertraging.serving.predictor import Departure, Predictor
 from ov_vertraging.serving.weather import OpenMeteoClient
 
 log = logging.getLogger(__name__)
+# De website staat naast de API in de repo (web/); in Docker via WEB_DIR.
+WEB_DIR = Path(os.getenv("WEB_DIR", Path(__file__).resolve().parents[1] / "web"))
 ATTRIBUTION = (
     "Treindata: Rijden de Treinen (CC BY 4.0). Weer: KNMI via Open-Meteo. Live vertrektijden: NS."
 )
@@ -68,6 +75,16 @@ class Train(BaseModel):
     next_stop: Station | None
 
 
+class Alternative(BaseModel):
+    train_number: int | None
+    type: str | None
+    planned_departure: datetime
+    planned_arrival: datetime | None
+    probability: float
+    risk_level: str
+    chosen: bool
+
+
 class PredictResponse(BaseModel):
     from_station: Station
     to_station: Station
@@ -79,6 +96,13 @@ class PredictResponse(BaseModel):
     )
     factors: list[Factor]
     weather: dict
+    alternatives: list[Alternative] = Field(
+        default_factory=list, description="Treinen rond hetzelfde tijdstip, met hun kans"
+    )
+    route_by_hour: list[float | None] = Field(
+        default_factory=list,
+        description="Historisch % vertraagd van het eerste rit-deel per uur (0-23)",
+    )
     model_version: str
     note: str
     attribution: str = ATTRIBUTION
@@ -99,6 +123,8 @@ class LiveDeparture(BaseModel):
     cancelled: bool
     probability: float | None
     risk_level: str | None
+    next_stop: Station | None = None
+    factors: list[Factor] = Field(default_factory=list)
 
 
 class DeparturesResponse(BaseModel):
@@ -112,6 +138,15 @@ def _delay_min(planned: datetime | None, actual: datetime | None) -> int | None:
     if planned is None or actual is None:
         return None
     return round((actual - planned).total_seconds() / 60)
+
+
+class WebFiles(StaticFiles):
+    """Statische website; browsers controleren bij elk bezoek of er een nieuwe versie is."""
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
 
 
 # ---------- app ----------
@@ -174,24 +209,30 @@ def create_app(predictor: Predictor | None = None, ns: NSClient | None = None) -
         destination = station_or_404(p, req.to_station)
         if origin == destination:
             raise HTTPException(422, "Vertrek- en aankomststation zijn hetzelfde.")
-        trip = p.find_trip(origin, destination, req.departure_time)
-        if trip is None:
+        trips, chosen = p.find_trips(origin, destination, req.departure_time)
+        if not trips:
             raise HTTPException(
                 404,
                 f"Geen directe trein gevonden van {p.station_name(origin)} naar "
                 f"{p.station_name(destination)} rond dit tijdstip. Reizen met een overstap "
                 "worden (nog) niet ondersteund.",
             )
-        dep = Departure(
-            station_code=origin,
-            next_station_code=trip["next_station_code"],
-            service_type=trip["service_type"],
-            company=trip["company"],
-            train_number=trip["train_number"],
-            stop_sequence=trip["stop_sequence"],
-            planned=trip["planned_departure"],
+        # Alle treinen rond het tijdstip in één keer voorspellen (voor 'andere tijden').
+        results = p.predict(
+            [
+                Departure(
+                    station_code=origin,
+                    next_station_code=t["next_station_code"],
+                    service_type=t["service_type"],
+                    company=t["company"],
+                    train_number=t["train_number"],
+                    stop_sequence=t["stop_sequence"],
+                    planned=t["planned_departure"],
+                )
+                for t in trips
+            ]
         )
-        result = p.predict([dep])[0]
+        trip, result = trips[chosen], results[chosen]
         nxt = trip["next_station_code"]
         return PredictResponse(
             from_station=Station(code=origin, name=p.station_name(origin)),
@@ -209,6 +250,19 @@ def create_app(predictor: Predictor | None = None, ns: NSClient | None = None) -
             average_probability=result["model_average"],
             factors=[Factor(**f) for f in result["factors"]],
             weather=result["weather"],
+            alternatives=[
+                Alternative(
+                    train_number=t["train_number"],
+                    type=t["service_type"],
+                    planned_departure=t["planned_departure"],
+                    planned_arrival=t.get("planned_arrival"),
+                    probability=r["probability"],
+                    risk_level=r["risk_level"],
+                    chosen=i == chosen,
+                )
+                for i, (t, r) in enumerate(zip(trips, results, strict=True))
+            ],
+            route_by_hour=p.route_hours(f"{origin}-{nxt}" if nxt else None),
             model_version=p.meta["version"],
             note=(
                 "Trein gezocht in de dienstregeling van dezelfde weekdag (laatste week van "
@@ -270,11 +324,30 @@ def create_app(predictor: Predictor | None = None, ns: NSClient | None = None) -
                     cancelled=d["cancelled"],
                     probability=preds[i]["probability"] if i in preds else None,
                     risk_level=preds[i]["risk_level"] if i in preds else None,
+                    next_stop=Station(
+                        code=d["next_station_code"], name=p.station_name(d["next_station_code"])
+                    )
+                    if d["next_station_code"]
+                    else None,
+                    factors=[Factor(**f) for f in preds[i]["factors"]] if i in preds else [],
                 )
                 for i, d in enumerate(live)
             ],
             model_version=p.meta["version"],
         )
+
+    @app.get("/insights")
+    def insights(
+        p: PredictorDep,
+        months: Annotated[int, Query(ge=1, le=24, description="Laatste N maanden")] = 12,
+        service_type: Annotated[str | None, Query(alias="type")] = None,
+    ) -> dict:
+        """KPI's, stiptheid per station, heatmap uur x weekdag en weer (binnenlandse treinen)."""
+        return insights_mod.compute(p.con.cursor(), months, service_type or None)
+
+    # De website als laatste: API-routes hierboven gaan voor.
+    if WEB_DIR.exists():
+        app.mount("/", WebFiles(directory=WEB_DIR, html=True), name="web")
 
     return app
 
