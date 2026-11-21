@@ -67,6 +67,67 @@ def timetable_days(con: duckdb.DuckDBPyConnection, days: int = TIMETABLE_DAYS) -
     return sorted(r[0] for r in rows)
 
 
+def _export_insights(con: duckdb.DuckDBPyConnection, out_dir: Path, last_full_day) -> dict:
+    """Voorgerekende aggregaten voor de pagina Inzichten (per maand x treintype).
+
+    Zo kan de website online filteren op periode en treintype zonder de database van
+    3 GB: alleen binnenlandse treinen vanaf Nederlandse stations, volledige dagen.
+    """
+    domestic = ", ".join(f"'{t}'" for t in ft.DOMESTIC_TYPES)
+    con.execute(
+        f"""
+        CREATE OR REPLACE TEMP TABLE insights_base AS
+        SELECT f.*, CAST(date_trunc('month', f.departure_date) AS DATE) AS maand
+        FROM marts.fct_departures AS f
+        JOIN marts.dim_station AS s ON s.station_code = f.station_code AND s.is_dutch
+        WHERE f.service_type IN ({domestic}) AND f.departure_date <= DATE '{last_full_day}'
+        """
+    )
+    counts = {}
+    counts["insights_station"] = _copy(
+        con,
+        """
+        SELECT maand, service_type, station_code,
+               count(*) AS n_all,
+               count(*) FILTER (is_cancelled) AS n_cancelled,
+               count(is_delayed_5min) AS n_target,
+               count(*) FILTER (is_delayed_5min) AS n_delayed,
+               sum(departure_delay_min) FILTER (NOT is_cancelled) AS sum_delay,
+               count(departure_delay_min) FILTER (NOT is_cancelled) AS n_delay
+        FROM insights_base GROUP BY ALL
+        """,
+        out_dir / "insights_station.parquet",
+    )
+    counts["insights_hour"] = _copy(
+        con,
+        """
+        SELECT maand, service_type, departure_weekday AS weekday, departure_hour AS hour,
+               count(is_delayed_5min) AS n_target,
+               count(*) FILTER (is_delayed_5min) AS n_delayed
+        FROM insights_base GROUP BY ALL
+        """,
+        out_dir / "insights_hour.parquet",
+    )
+    conditions = {
+        "Gewoon weer": "NOT (coalesce(has_snow, false) OR coalesce(is_frost, false) "
+        "OR coalesce(is_heavy_rain, false) OR coalesce(wind_gust_bft >= 9, false) "
+        "OR coalesce(temperature_c >= 30, false))",
+        "Sneeuw": "has_snow",
+        "Windstoten ≥ 9 Bft": "wind_gust_bft >= 9",
+        "Hevige regen (≥ 4 mm/u)": "is_heavy_rain",
+        "Vorst (< 0 °C)": "is_frost",
+        "Hitte (≥ 30 °C)": "temperature_c >= 30",
+    }
+    union = " UNION ALL ".join(
+        f"SELECT maand, service_type, '{label}' AS weer, "
+        f"count(is_delayed_5min) AS n_target, count(*) FILTER (is_delayed_5min) AS n_delayed "
+        f"FROM insights_base WHERE {cond} GROUP BY ALL"
+        for label, cond in conditions.items()
+    )
+    counts["insights_weather"] = _copy(con, union, out_dir / "insights_weather.parquet")
+    return counts
+
+
 def export(
     con: duckdb.DuckDBPyConnection,
     out_dir: Path = SERVING_DIR,
@@ -164,6 +225,7 @@ def export(
         "SELECT region, start_date, end_date FROM seeds.nl_school_holidays",
         out_dir / "school_holidays.parquet",
     )
+    counts.update(_export_insights(con, out_dir, last_full_day=days[-1]))
 
     meta = json.loads((model_dir / "model_metadata.json").read_text())
     shutil.copy(model_dir / meta["model_file"], out_dir / "model.txt")
@@ -202,6 +264,9 @@ def package(serving_dir: Path = SERVING_DIR, out_dir: Path = MODELS_DIR) -> Path
             "network",
             "stations",
             "school_holidays",
+            "insights_station",
+            "insights_hour",
+            "insights_weather",
         )
     ] + ["model.txt", "model_metadata.json", "manifest.json"]
     archive = out_dir / f"serving-{manifest['model_version']}.tar.gz"

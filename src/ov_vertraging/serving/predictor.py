@@ -30,6 +30,9 @@ TABLES = [
     "network",
     "stations",
     "school_holidays",
+    "insights_station",
+    "insights_hour",
+    "insights_weather",
 ]
 
 
@@ -113,14 +116,22 @@ class Predictor:
         self.meta = json.loads((self.dir / "model_metadata.json").read_text())
         self.manifest = json.loads((self.dir / "manifest.json").read_text())
         self.booster = lgb.Booster(model_file=str(self.dir / "model.txt"))
-        self.con = duckdb.connect()  # in het geheugen; de bestanden zijn klein
+        # In het geheugen; de bestanden zijn klein. Elke query gebruikt een eigen cursor
+        # (self.con.cursor()): de API beantwoordt verzoeken in meerdere threads tegelijk.
+        self.con = duckdb.connect()
         for name in TABLES:
             path = (self.dir / f"{name}.parquet").as_posix()
-            self.con.execute(f"CREATE TABLE {name} AS SELECT * FROM read_parquet('{path}')")
-        self.stations = self.con.execute("SELECT * FROM stations").df().set_index("station_code")
-        self.global_rate = self.con.execute(
-            "SELECT sum(hist_pct * hist_n) / sum(hist_n) FROM hist_station"
-        ).fetchone()[0]
+            self.con.cursor().execute(
+                f"CREATE TABLE {name} AS SELECT * FROM read_parquet('{path}')"
+            )
+        self.stations = (
+            self.con.cursor().execute("SELECT * FROM stations").df().set_index("station_code")
+        )
+        self.global_rate = (
+            self.con.cursor()
+            .execute("SELECT sum(hist_pct * hist_n) / sum(hist_n) FROM hist_station")
+            .fetchone()[0]
+        )
 
     # --- stations ---
 
@@ -137,9 +148,9 @@ class Predictor:
         """Nederlandse stations waar in de dienstregeling treinen vertrekken."""
         codes = {
             r[0]
-            for r in self.con.execute(
-                "SELECT DISTINCT station_code FROM timetable WHERE dep_minute IS NOT NULL"
-            ).fetchall()
+            for r in self.con.cursor()
+            .execute("SELECT DISTINCT station_code FROM timetable WHERE dep_minute IS NOT NULL")
+            .fetchall()
         }
         dutch = self.stations[self.stations.is_dutch.fillna(False)]
         rows = dutch[dutch.index.isin(codes)].station_name.sort_values()
@@ -155,40 +166,63 @@ class Predictor:
 
     # --- dienstregeling ---
 
-    def find_trip(self, origin: str, destination: str, when: datetime) -> dict | None:
-        """De eerste directe trein van A naar B rond `when`, volgens de dienstregeling
-        van dezelfde weekdag in de laatste week van de data."""
+    TRIP_COLS = [
+        "service_id",
+        "train_number",
+        "service_type",
+        "company",
+        "station_code",
+        "next_station_code",
+        "stop_sequence",
+        "dep_minute",
+        "arr_minute",
+    ]
+
+    def find_trips(
+        self, origin: str, destination: str, when: datetime, before: int = 1, after: int = 2
+    ) -> tuple[list[dict], int]:
+        """Directe treinen van A naar B rond `when`, volgens de dienstregeling van
+        dezelfde weekdag in de laatste week van de data.
+
+        Geeft (ritten op volgorde van vertrek, index van de gekozen rit): de eerste rit
+        vanaf ~het gevraagde tijdstip, met `before` ritten ervoor en `after` erna.
+        """
         when = _local(when)
         minute = when.hour * 60 + when.minute
-        row = self.con.execute(
-            """
-            SELECT a.service_id, a.train_number, a.service_type, a.company,
+        rows = (
+            self.con.cursor()
+            .execute(
+                """
+            SELECT DISTINCT ON (a.dep_minute)
+                   a.service_id, a.train_number, a.service_type, a.company,
                    a.station_code, a.next_station_code, a.stop_sequence,
                    a.dep_minute, coalesce(b.arr_minute, b.dep_minute) AS arr_minute
             FROM timetable AS a
             JOIN timetable AS b
               ON b.service_id = a.service_id AND b.stop_sequence > a.stop_sequence
             WHERE a.station_code = ? AND b.station_code = ? AND a.weekday = ?
-              AND a.dep_minute BETWEEN ? - 30 AND ? + 180
-            ORDER BY (a.dep_minute < ? - 5)::int, a.dep_minute
-            LIMIT 1
+              AND a.dep_minute BETWEEN ? - 120 AND ? + 240
+            ORDER BY a.dep_minute, coalesce(b.arr_minute, b.dep_minute)
             """,
-            [origin, destination, when.isoweekday(), minute, minute, minute],
-        ).fetchone()
-        if row is None:
-            return None
-        cols = [
-            "service_id",
-            "train_number",
-            "service_type",
-            "company",
-            "station_code",
-            "next_station_code",
-            "stop_sequence",
-            "dep_minute",
-            "arr_minute",
-        ]
-        trip = dict(zip(cols, row, strict=True))
+                [origin, destination, when.isoweekday(), minute, minute],
+            )
+            .fetchall()
+        )
+        trips = [self._trip(dict(zip(self.TRIP_COLS, r, strict=True)), when) for r in rows]
+        if not trips:
+            return [], -1
+        later = [i for i, t in enumerate(trips) if t["dep_minute"] >= minute - 5]
+        chosen = later[0] if later else len(trips) - 1
+        lo = max(0, chosen - before)
+        return trips[lo : chosen + after + 1], chosen - lo
+
+    def find_trip(self, origin: str, destination: str, when: datetime) -> dict | None:
+        """De eerste directe trein van A naar B vanaf ~`when`."""
+        trips, chosen = self.find_trips(origin, destination, when, before=0, after=0)
+        return trips[chosen] if trips else None
+
+    @staticmethod
+    def _trip(trip: dict, when: datetime) -> dict:
         trip["planned_departure"] = when.replace(
             hour=trip["dep_minute"] // 60,
             minute=trip["dep_minute"] % 60,
@@ -204,24 +238,48 @@ class Predictor:
             )
         return trip
 
+    def route_hours(self, route_code: str | None) -> list[float | None]:
+        """Historisch % vertraagd van dit traject (eerste rit-deel) per uur, 0-23."""
+        values: list[float | None] = [None] * 24
+        if not route_code:
+            return values
+        for hour, pct in (
+            self.con.cursor()
+            .execute(
+                "SELECT departure_hour, hist_pct FROM hist_route_hour WHERE route_code = ?",
+                [route_code],
+            )
+            .fetchall()
+        ):
+            values[int(hour)] = float(pct)
+        return values
+
     def stop_sequence_for(self, train_number: int | None, station: str, weekday: int):
         if train_number is None:
             return None
-        row = self.con.execute(
-            "SELECT stop_sequence FROM timetable WHERE train_number = ? AND station_code = ? "
-            "ORDER BY (weekday = ?)::int DESC LIMIT 1",
-            [train_number, station, weekday],
-        ).fetchone()
+        row = (
+            self.con.cursor()
+            .execute(
+                "SELECT stop_sequence FROM timetable WHERE train_number = ? AND station_code = ? "
+                "ORDER BY (weekday = ?)::int DESC LIMIT 1",
+                [train_number, station, weekday],
+            )
+            .fetchone()
+        )
         return row[0] if row else None
 
     # --- features ---
 
     def _school_regions(self, day: date) -> int:
-        return self.con.execute(
-            "SELECT count(DISTINCT region) FROM school_holidays "
-            "WHERE ? BETWEEN start_date AND end_date",
-            [day],
-        ).fetchone()[0]
+        return (
+            self.con.cursor()
+            .execute(
+                "SELECT count(DISTINCT region) FROM school_holidays "
+                "WHERE ? BETWEEN start_date AND end_date",
+                [day],
+            )
+            .fetchone()[0]
+        )
 
     def build_features(self, departures: list[Departure]) -> pd.DataFrame:
         rows = []
@@ -261,7 +319,11 @@ class Predictor:
 
         def lookup(table: str, keys: list[str], cols: dict[str, str]) -> None:
             nonlocal df
-            ref = self.con.execute(f"SELECT {', '.join(keys + list(cols))} FROM {table}").df()
+            ref = (
+                self.con.cursor()
+                .execute(f"SELECT {', '.join(keys + list(cols))} FROM {table}")
+                .df()
+            )
             df = df.merge(ref.rename(columns=cols), on=keys, how="left")
 
         lookup(
@@ -274,13 +336,15 @@ class Predictor:
             "hist_train", ["train_number"], {"hist_pct": "hist_train_pct", "hist_n": "hist_train_n"}
         )
         df = df.merge(
-            self.con.execute("SELECT * FROM planned")
+            self.con.cursor()
+            .execute("SELECT * FROM planned")
             .df()
             .rename(columns={"weekday": "departure_weekday", "hour": "departure_hour"}),
             on=["station_code", "departure_weekday", "departure_hour"],
             how="left",
         ).merge(
-            self.con.execute("SELECT * FROM network")
+            self.con.cursor()
+            .execute("SELECT * FROM network")
             .df()
             .rename(columns={"weekday": "departure_weekday", "hour": "departure_hour"}),
             on=["departure_weekday", "departure_hour"],
