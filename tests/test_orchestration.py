@@ -44,6 +44,9 @@ def test_alle_lagen_staan_in_de_lineage(defs):
         "intermediate/int_departures_with_weather",
         "marts/fct_departures",
         "marts/dim_date",
+        "ml_features",
+        "model_predictions",
+        "model_monitoring",
     ]:
         assert expected in keys
 
@@ -64,6 +67,7 @@ def test_raw_tabel_hangt_aan_download_en_dbt_aan_raw(defs):
 def test_kwaliteitschecks_zijn_asset_checks(defs):
     checks = {c.name for c in defs.resolve_asset_graph().asset_check_keys}
     assert {"row_count", "unique_stop_id", "weather_unique_hour"} <= checks
+    assert "kalibratie_laatste_30_dagen" in checks
 
 
 def test_dagelijks_schema_staat_aan(defs):

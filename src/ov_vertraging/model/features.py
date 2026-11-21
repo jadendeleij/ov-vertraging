@@ -227,6 +227,17 @@ def load_split(
     nodig om binnen 8 GB werkgeheugen te blijven.
     """
     period = SPLITS[split]
+    return load_period(con, period.start, period.end, sample_n=sample_n, seed=seed)
+
+
+def load_period(
+    con: duckdb.DuckDBPyConnection,
+    start: date,
+    end: date,
+    sample_n: int | None = None,
+    seed: int = 42,
+) -> pd.DataFrame:
+    """Laad alle vertrekken tussen start en end (inclusief), klaar voor het model."""
     cols = ", ".join(["departure_id", "departure_date", TARGET, *FEATURES])
     # Eerst filteren op de periode, dan pas de steekproef nemen (subquery): anders
     # trekt DuckDB de steekproef uit de hele tabel en blijven er minder rijen over.
@@ -239,7 +250,7 @@ def load_split(
             f"SELECT * FROM ({sql}) "
             f"USING SAMPLE reservoir({int(sample_n)} ROWS) REPEATABLE ({int(seed)})"
         )
-    df = con.execute(sql, [period.start, period.end]).df()
+    df = con.execute(sql, [start, end]).df()
     for col in CATEGORICAL:
         df[col] = df[col].astype("category")
     df[NUMERIC] = df[NUMERIC].astype("float32")
