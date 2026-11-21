@@ -9,7 +9,7 @@
 **🌐 Probeer het live:** [ov-vertraging-app.onrender.com](https://ov-vertraging-app.onrender.com) · [API-documentatie](https://ov-vertraging-api.onrender.com/docs)
 <sub>Gratis hosting: na 15 minuten zonder bezoek slaapt de app; het eerste bezoek duurt dan ~1 minuut.</sub>
 
-![Dashboard met kaart van 396 stations gekleurd op stiptheid](docs/img/dashboard.png)
+![Demo: reis kiezen, voorspelling met uitleg en weer, daarna live NS-vertrekken met per trein de kans](docs/img/demo.gif)
 
 ## Wat het doet
 

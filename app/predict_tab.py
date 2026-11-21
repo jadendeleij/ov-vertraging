@@ -90,7 +90,7 @@ def render_predict(api_url: str) -> None:
     st.markdown("**Waarom?**")
     for f in r["factors"]:
         arrow = "🔺" if f["effect"] == "verhoogt" else "🔻"
-        st.markdown(f"{arrow} {f['description'].capitalize()} — *{f['effect']} de kans*")
+        st.markdown(f"{arrow} {api.sentence(f['description'])} — *{f['effect']} de kans*")
 
     w = r["weather"]
     if w.get("temperature_c") is not None:
