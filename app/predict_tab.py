@@ -4,7 +4,7 @@ Geen eigen modelcode hier: alles gaat via de API (ov_vertraging.api_client), zod
 website en de API altijd hetzelfde antwoord geven.
 """
 
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 import pandas as pd
 import streamlit as st
@@ -36,8 +36,8 @@ def render_predict(api_url: str) -> None:
         "de kans dat hij met **5 minuten of meer vertraging** vertrekt, met de "
         "weersverwachting van het KNMI erbij."
     )
-    now = datetime.now()
-    next_hour = (now + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+    now = api.now_nl()  # niet datetime.now(): de server draait in UTC
+    next_hour = api.next_full_hour(now)
     with st.form("voorspel"):
         a, b = st.columns(2)
         with a:
@@ -48,8 +48,8 @@ def render_predict(api_url: str) -> None:
         day = c.date_input(
             "Datum",
             value=next_hour.date(),
-            min_value=date.today(),
-            max_value=date.today() + timedelta(days=14),
+            min_value=now.date(),
+            max_value=now.date() + timedelta(days=14),
             format="DD-MM-YYYY",
             help="Tot 14 dagen vooruit: verder reikt de weersverwachting niet.",
         )
@@ -144,5 +144,5 @@ def render_live(api_url: str) -> None:
     st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
     st.caption(
         "'Nu (NS)' is de actuele vertraging volgens NS, alleen ter vergelijking: het model "
-        f"gebruikt die niet. Opgehaald om {datetime.now():%H:%M}."
+        f"gebruikt die niet. Opgehaald om {api.now_nl():%H:%M}."
     )
