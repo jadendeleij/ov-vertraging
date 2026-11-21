@@ -62,15 +62,18 @@ def by_group(df: pd.DataFrame, p: np.ndarray, col: str, min_n: int = 1000) -> pd
 def calibration_plot(preds: dict[str, np.ndarray], y: np.ndarray, path: Path) -> None:
     """Voorspelde kans tegen werkelijk percentage, per model (kwantiel-bakjes)."""
     fig, ax = plt.subplots(figsize=(6, 5))
-    ax.plot([0, 0.4], [0, 0.4], "k--", lw=1, label="perfect gekalibreerd")
+    top = 0.0
     for name, p in preds.items():
         frac, mean_pred = calibration_curve(y, p, n_bins=20, strategy="quantile")
         ax.plot(mean_pred, frac, marker="o", ms=4, label=name, color=COLORS.get(name))
+        top = max(top, frac.max(), mean_pred.max())
+    top = round(top * 1.15, 2)  # as meeschalen met de data
+    ax.plot([0, top], [0, top], "k--", lw=1, label="perfect gekalibreerd")
     ax.set_xlabel("voorspelde kans op ≥ 5 min vertraging")
     ax.set_ylabel("werkelijk % vertraagd")
     ax.set_title("Kalibratie op de testset (sep–okt 2026)")
-    ax.set_xlim(0, 0.4)
-    ax.set_ylim(0, 0.4)
+    ax.set_xlim(0, top)
+    ax.set_ylim(0, top)
     ax.legend()
     fig.tight_layout()
     fig.savefig(path, dpi=150)
@@ -149,7 +152,7 @@ def results_markdown(
     ]
     for _, r in by_type.iterrows():
         lines.append(
-            f"| {r.service_type} | {r.n:,} | {pct(r.base_rate)} | {r.pr_auc:.3f} "
+            f"| {r.service_type} | {int(r.n):,} | {pct(r.base_rate)} | {r.pr_auc:.3f} "
             f"| {r.roc_auc:.3f} |".replace(",", ".")
         )
     lines += [
@@ -161,7 +164,7 @@ def results_markdown(
     ]
     for _, r in by_month.iterrows():
         lines.append(
-            f"| {int(r.month)} | {r.n:,} | {pct(r.base_rate)} | {r.pr_auc:.3f} "
+            f"| {int(r.month)} | {int(r.n):,} | {pct(r.base_rate)} | {r.pr_auc:.3f} "
             f"| {r.roc_auc:.3f} |".replace(",", ".")
         )
     lines += [
@@ -173,7 +176,7 @@ def results_markdown(
     ]
     for _, r in worst_days.iterrows():
         lines.append(
-            f"| {r.datum:%Y-%m-%d} | {r.vertrekken:,} | {pct(r.werkelijk)} "
+            f"| {r.datum:%Y-%m-%d} | {int(r.vertrekken):,} | {pct(r.werkelijk)} "
             f"| {pct(r.voorspeld)} |".replace(",", ".")
         )
     lines += [

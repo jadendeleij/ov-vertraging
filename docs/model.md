@@ -63,4 +63,63 @@
 - **Brier-score** — gemiddelde kwadratische fout van de kans (lager is beter); samen met de **kalibratiecurve** laat dit zien of "10 % kans" ook echt 10 % betekent.
 - Uitsplitsing per **treintype** en per **maand**, **SHAP**-samenvatting (welke features wegen het zwaarst) en een **foutanalyse**.
 
-*Resultaten volgen in sectie 7 na de training.*
+## 7. Resultaten
+
+Reproduceren: `python -m ov_vertraging.model.train` (≈ 20 minuten rekentijd, piekgeheugen 6,7 GB). Alle runs staan in MLflow (`mlflow ui --backend-store-uri sqlite:///mlflow.db`); de volledige, automatisch gegenereerde tabellen in [`model_results.md`](model_results.md).
+
+### Testset (sep–okt 2026, 2,9 mln vertrekken, 4,2 % vertraagd)
+
+| Model | PR-AUC ↑ | ROC-AUC ↑ | Brier ↓ | Top 10 % riskantste vertrekken vangt … van alle vertragingen |
+|---|---|---|---|---|
+| Willekeurig gokken | 0,042 | 0,500 | — | 10 % |
+| Baseline (historisch % traject × uur) | 0,092 | 0,683 | 0,0391 | 25,8 % |
+| Logistische regressie | 0,100 | 0,678 | 0,0390 | — |
+| **LightGBM** | **0,107** | **0,701** | **0,0389** | **27,9 %** |
+
+Gekozen LightGBM: 255 bladeren, `min_child_samples` 1000, leersnelheid 0,05, 108 bomen (early stopping op augustus; PR-AUC validatie 0,096). Getraind op een steekproef van 2 mln vertrekken uit nov–jul plus heel augustus.
+
+**Hoe lees je dit?**
+- LightGBM vindt vertraagde treinen **2,5× zo goed als gokken** (PR-AUC 0,107 tegen 0,042) en ~16 % beter dan de simpele vuistregel.
+- Concreet: in de 10 % vertrekken die het model het riskantst vindt, zit 28 % van alle vertragingen; van die vertrekken is 11,6 % daadwerkelijk vertraagd (tegen 4,2 % gemiddeld).
+- Eerlijk: de winst op de baseline is bescheiden. Het grootste deel van wat voorspelbaar is, zit al in *"dit traject op dit uur was vaker te laat"*.
+
+### Per treintype en maand
+
+| | % vertraagd | PR-AUC | ROC-AUC |
+|---|---|---|---|
+| Sprinter | 3,7 % | 0,075 | 0,665 |
+| Stoptrein | 2,8 % | 0,139 | 0,732 |
+| Intercity | 6,2 % | 0,116 | 0,666 |
+| Sneltrein | 6,3 % | 0,154 | 0,749 |
+| Intercity direct | 8,8 % | 0,149 | 0,650 |
+| september | 3,7 % | 0,098 | 0,702 |
+| oktober | 4,6 % | 0,118 | 0,703 |
+
+Regionale stoptreinen (andere vervoerders, vaste lijnen) zijn het best voorspelbaar; Sprinters het slechtst — hun vertraging komt vaak van ander treinverkeer op drukke hoofdlijnen.
+
+### Kalibratie
+
+![Kalibratiecurve](img/calibration.png)
+
+Baseline en logistische regressie liggen op de diagonaal. LightGBM **onderschat** structureel: bij een voorspelde 4 % was het werkelijk ~4,8 %. Oorzaak: getraind t/m augustus (rustig, 3,6 %), getest in de herfst (4,2 %). Verbetering voor later: hercalibreren op de meest recente maand (bv. isotone regressie) of het seizoen sterker laten meewegen.
+
+### Wat drijft de voorspelling? (SHAP)
+
+![SHAP-samenvatting](img/shap_summary.png)
+
+1. **Geschiedenis** domineert: het historische % van traject × uur, het traject zelf en het historische % van het treinnummer.
+2. **Drukte**: hoe meer treinen er landelijk in dat uur gepland staan, hoe hoger de kans.
+3. **Uur en positie in de rit**: later op de dag en verder in de rit = meer opgebouwde vertraging.
+4. **Weer**: temperatuur (warmte), neerslag en luchtvochtigheid duwen de kans omhoog, maar wegen minder dan de geschiedenis.
+5. Opvallend: treinnummers met **weinig geschiedenis** (`hist_train_n` laag) hebben een hógere kans — dat zijn extra ritten en vervangende diensten.
+
+### Foutanalyse: waar zit het model ernaast?
+
+De dagen met de grootste onderschatting:
+
+| Datum | Werkelijk | Voorspeld | Wat er gebeurde |
+|---|---|---|---|
+| 22–25 okt 2026 | 5,7–8,8 % | ~3 % | Storm (windstoten tot 10 Bft) en de nasleep ervan |
+| 10 sep 2026 | 6,6 % | 3,6 % | De dag ná de landelijke OV-staking: materieel en personeel stonden niet op de goede plek |
+
+Dit is de kern van de beperking: **storingen, stormschade en de nasleep van een staking zijn op het voorspelmoment niet bekend.** Het model voorspelt goed *welke* trajecten en uren structureel kwetsbaar zijn, maar ziet een slechte dag niet aankomen — zeker niet met gemeten in plaats van voorspeld weer als bovengrens. Mogelijke verbeteringen: weersverwachting met windstoten in de features (fase 5), het aantal lopende storingen op het netwerk als live feature, en hercalibratie.

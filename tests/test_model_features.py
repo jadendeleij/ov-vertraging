@@ -110,3 +110,11 @@ def test_load_split_types(con, monkeypatch):
     assert str(df["route_code"].dtype) == "category"
     assert str(df["hist_route_hour_pct"].dtype) == "float32"
     assert df[ft.TARGET].tolist() == [0, 1]
+
+
+def test_steekproef_binnen_de_periode_met_precies_n_rijen(con, monkeypatch):
+    # Periode = dag 2 en 3; de steekproef moet ná het filteren genomen worden.
+    monkeypatch.setitem(ft.SPLITS, "train", ft.Period(date(2026, 1, 2), date(2026, 1, 3)))
+    df = ft.load_split(con, "train", sample_n=2)
+    assert len(df) == 2
+    assert df.departure_date.min().date() >= date(2026, 1, 2)

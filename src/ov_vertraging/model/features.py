@@ -228,14 +228,17 @@ def load_split(
     """
     period = SPLITS[split]
     cols = ", ".join(["departure_id", "departure_date", TARGET, *FEATURES])
-    sample = (
-        f"USING SAMPLE reservoir({int(sample_n)} ROWS) REPEATABLE ({int(seed)})" if sample_n else ""
-    )
+    # Eerst filteren op de periode, dan pas de steekproef nemen (subquery): anders
+    # trekt DuckDB de steekproef uit de hele tabel en blijven er minder rijen over.
     sql = f"""
         SELECT {cols} FROM {TABLE}
         WHERE departure_date BETWEEN ? AND ?
-        {sample}
     """
+    if sample_n:
+        sql = (
+            f"SELECT * FROM ({sql}) "
+            f"USING SAMPLE reservoir({int(sample_n)} ROWS) REPEATABLE ({int(seed)})"
+        )
     df = con.execute(sql, [period.start, period.end]).df()
     for col in CATEGORICAL:
         df[col] = df[col].astype("category")
@@ -244,9 +247,15 @@ def load_split(
     return df
 
 
-def category_lists(df: pd.DataFrame) -> dict[str, list[str]]:
-    """De categorieën zoals het model ze tijdens training zag (opslaan bij het model)."""
-    return {col: [str(c) for c in df[col].cat.categories] for col in CATEGORICAL}
+def category_lists(*dfs: pd.DataFrame) -> dict[str, list[str]]:
+    """Alle categorieën die het model tijdens training zag (opslaan bij het model).
+
+    Meerdere DataFrames (bv. train en validatie) worden samengevoegd tot één
+    gesorteerde lijst per kolom.
+    """
+    return {
+        col: sorted({str(c) for df in dfs for c in df[col].cat.categories}) for col in CATEGORICAL
+    }
 
 
 def align_categories(df: pd.DataFrame, categories: dict[str, list[str]]) -> pd.DataFrame:

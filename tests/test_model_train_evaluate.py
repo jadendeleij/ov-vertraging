@@ -41,6 +41,12 @@ def test_error_analysis_vindt_onderschatte_dag():
     assert worst.verschil.iloc[0] == pytest.approx(0.45)
 
 
+def test_category_lists_verenigt_train_en_validatie():
+    train = pd.DataFrame({c: pd.Categorical(["B", "A"]) for c in ft.CATEGORICAL})
+    val = pd.DataFrame({c: pd.Categorical(["C"]) for c in ft.CATEGORICAL})
+    assert ft.category_lists(train, val)[ft.CATEGORICAL[0]] == ["A", "B", "C"]
+
+
 def test_align_categories_zelfde_codes_en_onbekend_wordt_nan():
     train = pd.DataFrame({c: pd.Categorical(["A", "B"]) for c in ft.CATEGORICAL})
     cats = ft.category_lists(train)

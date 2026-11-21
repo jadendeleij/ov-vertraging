@@ -40,7 +40,7 @@ from ov_vertraging.model import features as ft
 log = logging.getLogger(__name__)
 
 SEED = 42
-TRAIN_SAMPLE = 3_000_000  # past binnen 8 GB werkgeheugen
+TRAIN_SAMPLE = 2_000_000  # piekgeheugen ~7 GB bij 2,2 mln: krap op 8 GB RAM
 LOGREG_SAMPLE = 1_000_000
 MLFLOW_URI = f"sqlite:///{PROJECT_ROOT / 'mlflow.db'}"
 EXPERIMENT = "ov-vertraging"
@@ -201,7 +201,7 @@ def main(skip_features: bool = False) -> None:
         train = ft.load_split(con, "train", sample_n=TRAIN_SAMPLE, seed=SEED)
         val = ft.load_split(con, "validation")
         base_table = baseline_table(con)
-    categories = ft.category_lists(pd.concat([train[ft.CATEGORICAL], val[ft.CATEGORICAL]]))
+    categories = ft.category_lists(train, val)
     train = ft.align_categories(train, categories)
     val = ft.align_categories(val, categories)
     log.info("Train-steekproef: %d, validatie: %d", len(train), len(val))
