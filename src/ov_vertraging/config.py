@@ -1,5 +1,6 @@
 """Centrale instellingen: paden, URL's en kolomschema's van treinarchief, stations en weer."""
 
+import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -7,7 +8,9 @@ DATA_DIR = PROJECT_ROOT / "data"
 RAW_DIR = DATA_DIR / "raw"
 SERVICES_DIR = RAW_DIR / "services"
 STATIONS_DIR = RAW_DIR / "stations"
-DB_PATH = DATA_DIR / "ov.duckdb"
+# Overschrijfbaar (zelfde variabele als het dbt-profiel), bv. voor CI of het dashboard
+# zonder database testen.
+DB_PATH = Path(os.getenv("OV_DUCKDB_PATH", DATA_DIR / "ov.duckdb"))
 
 # Rijden de Treinen treinarchief (CC BY 4.0)
 SERVICES_URL = "https://opendata.rijdendetreinen.nl/public/services/services-{month}.csv.gz"

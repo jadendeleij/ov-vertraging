@@ -163,6 +163,11 @@ def test_health(client):
     assert body["ns_configured"] is False
 
 
+def test_stations_alleen_met_vertrekken(client):
+    names = [s["name"] for s in client.get("/stations").json()]
+    assert names == ["Bergen op Zoom", "Roosendaal"]  # RTB is alleen eindpunt
+
+
 def test_predict_vindt_directe_trein(client):
     resp = client.post(
         "/predict",

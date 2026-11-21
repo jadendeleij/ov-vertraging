@@ -153,6 +153,11 @@ def create_app(predictor: Predictor | None = None, ns: NSClient | None = None) -
             raise HTTPException(404, msg + (f" Bedoel je: {', '.join(hint)}?" if hint else ""))
         return code
 
+    @app.get("/stations", response_model=list[Station])
+    def stations(p: PredictorDep) -> list[Station]:
+        """Alle Nederlandse stations met vertrekken (voor keuzelijsten)."""
+        return [Station(**s) for s in p.station_list()]
+
     @app.get("/health")
     def health(p: PredictorDep, ns: NSDep) -> dict:
         return {

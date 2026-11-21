@@ -133,6 +133,18 @@ class Predictor:
         by_name = dutch.index[dutch.station_name.str.casefold() == text.strip().casefold()]
         return by_name[0] if len(by_name) else None
 
+    def station_list(self) -> list[dict]:
+        """Nederlandse stations waar in de dienstregeling treinen vertrekken."""
+        codes = {
+            r[0]
+            for r in self.con.execute(
+                "SELECT DISTINCT station_code FROM timetable WHERE dep_minute IS NOT NULL"
+            ).fetchall()
+        }
+        dutch = self.stations[self.stations.is_dutch.fillna(False)]
+        rows = dutch[dutch.index.isin(codes)].station_name.sort_values()
+        return [{"code": code, "name": name} for code, name in rows.items()]
+
     def suggest_stations(self, text: str, limit: int = 5) -> list[str]:
         dutch = self.stations[self.stations.is_dutch.fillna(False)]
         mask = dutch.station_name.str.contains(text.strip(), case=False, regex=False)

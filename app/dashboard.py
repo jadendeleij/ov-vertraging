@@ -1,21 +1,29 @@
-"""Streamlit-dashboard: punctualiteit van het Nederlandse spoor.
+"""Streamlit-dashboard: punctualiteit van het Nederlandse spoor + voorspellingen.
 
-Starten (vanuit de projectroot):
+Starten (vanuit de projectroot, met de API ernaast: `uvicorn api.main:app`):
     streamlit run app/dashboard.py
 
-Leest alleen uit de dbt-marts in data/ov.duckdb (read-only). Alle SQL staat in
-ov_vertraging.dashboard_queries; dit bestand regelt alleen de opmaak.
+Twee standen:
+- met data/ov.duckdb (lokaal): analyse-tabbladen uit de dbt-marts + voorspellen;
+- zonder database (online, bv. op Render): alleen 'Voorspel mijn reis' en 'Live
+  vertrekken'; die praten met de API op API_URL.
+
+Alle SQL staat in ov_vertraging.dashboard_queries; dit bestand regelt de opmaak.
 """
+
+import os
 
 import duckdb
 import plotly.express as px
 import streamlit as st
+from predict_tab import render_live, render_predict  # app/ staat op het pad via streamlit
 
 from ov_vertraging import dashboard_queries as dq
 from ov_vertraging.config import DB_PATH
 
 st.set_page_config(page_title="OV-vertraging", page_icon="🚆", layout="wide")
 
+API_URL = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
 WEEKDAGEN = ["ma", "di", "wo", "do", "vr", "za", "zo"]
 RED_SCALE = "YlOrRd"
 
@@ -35,11 +43,33 @@ def cached(name: str, *args):
         return getattr(dq, name)(con, *args)
 
 
+SOURCES = (
+    "Bron treindata en stations: [Rijden de Treinen](https://www.rijdendetreinen.nl/open-data) "
+    "(licentie [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)). "
+    "Weer: [KNMI](https://www.knmi.nl/nederland-nu/klimatologie/uurgegevens), verwachting via "
+    "[Open-Meteo](https://open-meteo.com). Live vertrektijden: NS. "
+    "Feestdagen en schoolvakanties: Rijksoverheid. "
+    "Code: [github.com/jadendeleij/ov-vertraging](https://github.com/jadendeleij/ov-vertraging)."
+)
+
 if not DB_PATH.exists():
-    st.error(
-        "Geen database gevonden. Draai eerst de pipeline: "
-        "`python -m ov_vertraging.load` en `cd transform && dbt build` (of via Dagster)."
+    # Online stand: geen grote database, alleen voorspellen via de API.
+    st.title("🚆 Komt mijn trein op tijd?")
+    st.caption(
+        "Voorspelt de kans dat een Nederlandse trein met ≥ 5 minuten vertraging vertrekt, "
+        "op basis van een jaar treindata en de KNMI-weersverwachting."
     )
+    tab_voorspel, tab_live = st.tabs(["🔮 Voorspel mijn reis", "🚉 Live vertrekken"])
+    with tab_voorspel:
+        render_predict(API_URL)
+    with tab_live:
+        render_live(API_URL)
+    st.info(
+        "De analyse-tabbladen (kaart, heatmap, weer) draaien lokaal op de volledige "
+        "database van 22,5 mln treinstops; zie de README op GitHub."
+    )
+    st.divider()
+    st.caption(SOURCES)
     st.stop()
 
 
@@ -105,8 +135,15 @@ c2.metric("≥ 5 min vertraagd", f"{nl(k['pct_vertraagd'])} %")
 c3.metric("Uitgevallen", f"{nl(k['pct_uitval'])} %")
 c4.metric("Gem. vertraging", f"{nl(k['gem_vertraging'])} min")
 
-tab_overzicht, tab_kaart, tab_weer, tab_traject = st.tabs(
-    ["📊 Overzicht", "🗺️ Kaart", "🌧️ Weer", "🔍 Mijn traject"]
+tab_overzicht, tab_kaart, tab_weer, tab_traject, tab_voorspel, tab_live = st.tabs(
+    [
+        "📊 Overzicht",
+        "🗺️ Kaart",
+        "🌧️ Weer",
+        "🔍 Mijn traject",
+        "🔮 Voorspel mijn reis",
+        "🚉 Live vertrekken",
+    ]
 )
 
 # ---------- overzicht ----------
@@ -303,13 +340,15 @@ with tab_traject:
                 },
             )
 
+# ---------- voorspellen (via de API) ----------
+
+with tab_voorspel:
+    render_predict(API_URL)
+
+with tab_live:
+    render_live(API_URL)
+
 # ---------- bron ----------
 
 st.divider()
-st.caption(
-    "Bron treindata en stations: [Rijden de Treinen](https://www.rijdendetreinen.nl/open-data) "
-    "(licentie [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)). "
-    "Weer: [KNMI](https://www.knmi.nl/nederland-nu/klimatologie/uurgegevens). "
-    "Feestdagen en schoolvakanties: Rijksoverheid. "
-    "Code: [github.com/jadendeleij/ov-vertraging](https://github.com/jadendeleij/ov-vertraging)."
-)
+st.caption(SOURCES)
