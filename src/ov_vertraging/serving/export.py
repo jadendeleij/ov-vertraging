@@ -17,9 +17,12 @@ Schrijft naar models/serving/:
 Idempotent: de map wordt elke keer volledig overschreven.
 """
 
+import argparse
+import hashlib
 import json
 import logging
 import shutil
+import tarfile
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -180,10 +183,52 @@ def export(
     return manifest
 
 
+def package(serving_dir: Path = SERVING_DIR, out_dir: Path = MODELS_DIR) -> Path:
+    """Pak de export in als serving-<modelversie>.tar.gz (voor een GitHub Release).
+
+    Alleen de bekende bestanden gaan erin, zodat er nooit per ongeluk iets anders
+    (zoals een .env) in een openbaar bestand belandt. Naast het archief komt een
+    .sha256-bestand om de download te kunnen controleren.
+    """
+    manifest = json.loads((serving_dir / "manifest.json").read_text())
+    names = [
+        f"{t}.parquet"
+        for t in (
+            "timetable",
+            "hist_route_hour",
+            "hist_station",
+            "hist_train",
+            "planned",
+            "network",
+            "stations",
+            "school_holidays",
+        )
+    ] + ["model.txt", "model_metadata.json", "manifest.json"]
+    archive = out_dir / f"serving-{manifest['model_version']}.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        for name in names:
+            tar.add(serving_dir / name, arcname=name)
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    archive.with_suffix(".gz.sha256").write_text(f"{digest}  {archive.name}\n")
+    log.info(
+        "Ingepakt: %s (%.1f MB), sha256 %s", archive.name, archive.stat().st_size / 1e6, digest[:12]
+    )
+    return archive
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Maak de serving-export voor de API.")
+    parser.add_argument(
+        "--package",
+        action="store_true",
+        help="Pak de bestaande export ook in als tar.gz (voor een Release).",
+    )
+    args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     with duckdb.connect(str(DB_PATH), read_only=True) as con:
         export(con)
+    if args.package:
+        package()
 
 
 if __name__ == "__main__":
