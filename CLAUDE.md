@@ -237,3 +237,8 @@ Werk dit bij na elke afgeronde taak (datum, wat gedaan, wat volgende stap).
   - Dashboard hield DB open → blokkeerde schrijven door Dagster; nu korte verbinding per query.
   - Oud modelbestand `models/lightgbm_20261120.txt` (eerste run) staat nog lokaal; mag weg.
   - Volgende stap: PR naar main; daarna Fase 5 (API, weersverwachting, Docker, CI, hosting — eerst overleggen).
+- 2026-11-21 — Fase 5 gestart (branch `fase-5-live`). Keuzes (met jou):
+  - **Weersverwachting:** Open-Meteo met het KNMI-model (`models=knmi_seamless`, HARMONIE 2 km, 2,5 dag; daarna ECMWF). Gratis, geen key, max. 10.000 verzoeken/dag, niet-commercieel. Getest: temperature_2m, precipitation, wind_speed_10m, wind_gusts_10m (m/s), visibility (m), relative_humidity_2m, snowfall, weather_code — allemaal aanwezig. Mist/ijzel afleiden uit weather_code (45/48, 56/57/66/67).
+  - **Hosting:** Render free (512 MB RAM per dienst, 750 uur/maand, slaapt na 15 min, ~1 min opstarten). Database (3 GB) past niet → slanke serving-export (Parquet, enkele MB) met model, historie-lookups en dienstregeling-tellingen.
+  - **NS API-key:** jij vraagt hem aan op apiportal.ns.nl en zet hem in `.env` als `NS_API_KEY` (nooit in chat of git).
+  - Volgende stap: serving-export + FastAPI (`/health`, `/predict`, `/departures/{station}`) met TestClient-tests.
