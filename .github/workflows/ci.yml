@@ -61,8 +61,19 @@ jobs:
       - name: API-image bouwen
         run: docker build -f api/Dockerfile -t ov-api .
 
-      - name: API-image importeert zonder fouten
-        run: docker run --rm ov-api python -c "import api.main; print('ok')"
+      - name: API start en voorspelt (model uit de GitHub Release)
+        run: |
+          docker run -d --name api -p 8000:8000 ov-api
+          for i in $(seq 1 30); do
+            curl -fs http://localhost:8000/health && break
+            sleep 2
+          done
+          curl -fs -X POST http://localhost:8000/predict \
+            -H 'Content-Type: application/json' \
+            -d '{"from_station":"Utrecht Centraal","to_station":"Amsterdam Centraal","departure_time":"2026-11-24T08:00"}' \
+            | tee predict.json
+          python3 -c "import json; r=json.load(open('predict.json')); assert 0 < r['probability'] < 1, r"
+          docker stats --no-stream --format 'API-geheugen: {{.MemUsage}}' api
 
       - name: Dashboard-image bouwen
         run: docker build -f app/Dockerfile -t ov-app .

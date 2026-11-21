@@ -18,12 +18,13 @@ import plotly.express as px
 import streamlit as st
 from predict_tab import render_live, render_predict  # app/ staat op het pad via streamlit
 
+from ov_vertraging import api_client
 from ov_vertraging import dashboard_queries as dq
 from ov_vertraging.config import DB_PATH
 
 st.set_page_config(page_title="OV-vertraging", page_icon="🚆", layout="wide")
 
-API_URL = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
+API_URL = api_client.base_url(os.getenv("API_URL", "http://localhost:8000"))
 WEEKDAGEN = ["ma", "di", "wo", "do", "vr", "za", "zo"]
 RED_SCALE = "YlOrRd"
 

@@ -1,0 +1,30 @@
+# Render Blueprint: API + dashboard als twee gratis web services (infrastructure as code).
+# Op render.com: New → Blueprint → deze repo kiezen. Render bouwt beide Dockerfiles en
+# deployt opnieuw bij elke push naar main.
+#
+# Gratis plan: 512 MB RAM per dienst, slaapt na 15 minuten zonder bezoek (eerste bezoek
+# daarna ~1 minuut wachten). Geheugengebruik API in tests: ~150 MB.
+services:
+  - type: web
+    name: ov-vertraging-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: NS_API_KEY
+        sync: false          # vul je zelf in op Render (komt nooit in git)
+
+  - type: web
+    name: ov-vertraging-app
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./app/Dockerfile
+    dockerContext: .
+    healthCheckPath: /_stcore/health
+    envVars:
+      - key: API_URL
+        sync: false          # de publieke URL van de API, bv. https://ov-vertraging-api.onrender.com

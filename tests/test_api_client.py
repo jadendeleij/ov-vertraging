@@ -56,3 +56,8 @@ def test_api_onbereikbaar(monkeypatch):
 def test_format_pct():
     assert api.format_pct(0.0388) == "3,9 %"
     assert api.format_pct(None) == "–"
+
+
+def test_base_url_voegt_schema_toe():
+    assert api.base_url("ov-api.onrender.com/") == "https://ov-api.onrender.com"
+    assert api.base_url("http://localhost:8000") == "http://localhost:8000"

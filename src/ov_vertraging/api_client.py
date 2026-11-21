@@ -8,7 +8,13 @@ from datetime import datetime
 
 import requests
 
-TIMEOUT = 30  # Render free: de API kan na slaap ~1 minuut nodig hebben om op te starten
+TIMEOUT = 90  # Render free: een slapende API heeft ~1 minuut nodig om op te starten
+
+
+def base_url(url: str) -> str:
+    """'ov-api.onrender.com/' -> 'https://ov-api.onrender.com' (schema erbij, geen slash)."""
+    url = url.strip().rstrip("/")
+    return url if "://" in url else f"https://{url}"
 
 
 class ApiError(RuntimeError):

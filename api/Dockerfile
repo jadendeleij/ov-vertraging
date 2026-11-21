@@ -3,12 +3,13 @@
 # Draaien (met de lokale serving-export als volume):
 #   docker run -p 8000:8000 -v "$PWD/models/serving:/app/models/serving:ro" --env-file .env ov-api
 #
-# De serving-export (model + kleine Parquet-bestanden, ~8 MB) zit niet in git. Geef
-# SERVING_URL mee om hem bij het bouwen te downloaden (bv. een GitHub Release), of
-# mount hem als volume.
+# De serving-export (model + kleine Parquet-bestanden) zit niet in git maar in een
+# GitHub Release; die wordt bij het bouwen gedownload en gecontroleerd (sha256).
+# Nieuw model? `python -m ov_vertraging.serving.export --package`, nieuwe Release, en
+# hieronder SERVING_VERSION ophogen. Lokaal kan ook een volume (zie docker-compose.yml).
 FROM python:3.12-slim
 
-# LightGBM heeft OpenMP (libgomp) nodig; curl voor de healthcheck en SERVING_URL.
+# LightGBM heeft OpenMP (libgomp) nodig; curl voor de healthcheck en de Release-download.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libgomp1 curl \
     && rm -rf /var/lib/apt/lists/*
@@ -22,10 +23,15 @@ RUN pip install --no-cache-dir ".[api]"
 
 COPY api ./api
 
-ARG SERVING_URL=""
-RUN mkdir -p models/serving \
-    && if [ -n "$SERVING_URL" ]; then \
-         curl -fsSL "$SERVING_URL" | tar -xz -C models/serving; \
+ARG SERVING_VERSION=20261121
+ARG SERVING_BASE=https://github.com/jadendeleij/ov-vertraging/releases/download
+RUN mkdir -p models/serving && cd models \
+    && if [ "$SERVING_VERSION" != "none" ]; then \
+         f="serving-${SERVING_VERSION}.tar.gz"; \
+         curl -fsSLO "${SERVING_BASE}/serving-${SERVING_VERSION}/${f}" \
+         && curl -fsSLO "${SERVING_BASE}/serving-${SERVING_VERSION}/${f}.sha256" \
+         && sha256sum -c "${f}.sha256" \
+         && tar -xzf "${f}" -C serving && rm "${f}" "${f}.sha256"; \
        fi
 
 # Niet als root draaien.
