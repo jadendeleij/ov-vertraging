@@ -136,7 +136,7 @@ c2.metric("≥ 5 min vertraagd", f"{nl(k['pct_vertraagd'])} %")
 c3.metric("Uitgevallen", f"{nl(k['pct_uitval'])} %")
 c4.metric("Gem. vertraging", f"{nl(k['gem_vertraging'])} min")
 
-tab_overzicht, tab_kaart, tab_weer, tab_traject, tab_voorspel, tab_live = st.tabs(
+(tab_overzicht, tab_kaart, tab_weer, tab_traject, tab_voorspel, tab_live, tab_monitoring) = st.tabs(
     [
         "📊 Overzicht",
         "🗺️ Kaart",
@@ -144,6 +144,7 @@ tab_overzicht, tab_kaart, tab_weer, tab_traject, tab_voorspel, tab_live = st.tab
         "🔍 Mijn traject",
         "🔮 Voorspel mijn reis",
         "🚉 Live vertrekken",
+        "📈 Monitoring",
     ]
 )
 
@@ -348,6 +349,69 @@ with tab_voorspel:
 
 with tab_live:
     render_live(API_URL)
+
+# ---------- monitoring ----------
+
+with tab_monitoring:
+    st.write(
+        "Hoe goed voorspelt het model **dagen die het nog nooit zag**? Elke dag scoort "
+        "Dagster de nieuwe dagen en vergelijkt de voorspelling met wat er echt gebeurde."
+    )
+    mon = cached("monitoring_daily")
+    if mon.empty:
+        st.info(
+            "Nog geen monitoringdata. Draai `python -m ov_vertraging.monitoring` of de "
+            "Dagster-assets `model_predictions` en `model_monitoring`."
+        )
+    else:
+        recent = mon.tail(30)
+        ratio = (recent.voorspeld * recent.vertrekken).sum() / (
+            recent.werkelijk * recent.vertrekken
+        ).sum()
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Gemonitorde dagen", len(mon))
+        m2.metric("PR-AUC (laatste 30 dagen)", nl(recent.pr_auc.mean(), 3))
+        m3.metric(
+            "Voorspeld ÷ werkelijk (30 dagen)",
+            nl(ratio, 2),
+            help="1,00 = perfect gekalibreerd. Onder 0,67 of boven 1,5 geeft Dagster een "
+            "waarschuwing: tijd om opnieuw te trainen.",
+        )
+        long = mon.melt(
+            id_vars="datum",
+            value_vars=["werkelijk", "voorspeld"],
+            var_name="maat",
+            value_name="pct",
+        ).replace({"werkelijk": "werkelijk % vertraagd", "voorspeld": "gemiddeld voorspeld"})
+        long["pct"] = 100 * long["pct"]
+        fig = px.line(
+            long,
+            x="datum",
+            y="pct",
+            color="maat",
+            color_discrete_map={
+                "werkelijk % vertraagd": "#d62728",
+                "gemiddeld voorspeld": "#4c78a8",
+            },
+            labels={"pct": "%", "datum": "", "maat": ""},
+            title="Voorspeld vs. werkelijk, per dag",
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        fig = px.bar(
+            mon,
+            x="datum",
+            y="pr_auc",
+            labels={"pr_auc": "PR-AUC", "datum": ""},
+            title="Hoe goed rangschikt het model per dag? (PR-AUC; gokken ≈ 0,04)",
+            color_discrete_sequence=["#7f7f7f"],
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption(
+            f"Model {mon.model_version.iloc[-1]}. De echte uitkomsten komen per maand binnen "
+            "(Rijden de Treinen publiceert een maand na afloop), dus deze grafiek loopt tot "
+            "~1 maand achter. Het weer is hier gemeten; de live app gebruikt een verwachting "
+            "en scoort in de praktijk iets lager."
+        )
 
 # ---------- bron ----------
 

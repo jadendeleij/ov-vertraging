@@ -251,3 +251,14 @@ def trip_by_hour(
         """,
         [origin, *params, destination],
     )
+
+
+def monitoring_daily(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
+    """Dagelijkse modelmonitoring (monitoring.daily); leeg als die nog niet bestaat."""
+    exists = con.execute(
+        "SELECT count(*) FROM information_schema.tables "
+        "WHERE table_schema = 'monitoring' AND table_name = 'daily'"
+    ).fetchone()[0]
+    if not exists:
+        return pd.DataFrame()
+    return con.execute("SELECT * FROM monitoring.daily WHERE volledige_dag ORDER BY datum").df()

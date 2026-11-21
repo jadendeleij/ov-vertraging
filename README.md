@@ -14,7 +14,7 @@ Voorspelt de kans dat een trein in Nederland ≥ 5 minuten vertraging heeft bij 
 - [x] Fase 2 – Datapipeline (KNMI-weer, dbt, Dagster)
 - [x] Fase 3 – Analyse & dashboard
 - [x] Fase 4 – Model (LightGBM)
-- [ ] Fase 5 – Live API + web-app
+- [x] Fase 5 – Live API + web-app, Docker, CI en monitoring
 - [ ] Fase 6 – Presenteren
 
 ## Top 3 inzichten
@@ -81,6 +81,19 @@ docker compose up --build                   # API op :8000, dashboard op :8501
 
 Twee slanke images ([`api/Dockerfile`](api/Dockerfile), [`app/Dockerfile`](app/Dockerfile)): Python 3.12-slim, alleen de benodigde dependencies (de API-image bevat geen dbt, Dagster of MLflow), draaien niet als root, met healthchecks.
 
+### Monitoring
+
+Werkt het model nog op dagen die het nooit zag? Elke dag scoort Dagster de nieuwe dagen met het opgeslagen model ([`monitoring.py`](src/ov_vertraging/monitoring.py), incrementeel: elke dag precies één keer) en zet per dag *voorspeld vs. werkelijk %*, PR-AUC, ROC-AUC en Brier in `monitoring.daily`. Het dashboard toont dat in het tabblad **📈 Monitoring**; een Dagster-check waarschuwt als de verhouding voorspeld ÷ werkelijk over 30 dagen buiten 0,67–1,5 valt.
+
+Eerste uitkomst (model getraind t/m augustus):
+
+| Maand | Werkelijk vertraagd | Gemiddeld voorspeld | PR-AUC |
+|---|---|---|---|
+| september 2026 | 3,67 % | 3,58 % | 0,10 |
+| oktober 2026 | 4,65 % | 3,37 % | 0,12 |
+
+In september klopt het model goed; in oktober onderschat het met ~28 %: het mist het herfsteffect dat het in de trainingsdata (t/m augustus) niet zag. Dat is precies *model drift* — het signaal om het model maandelijks opnieuw te trainen. Beperking: de echte uitkomsten komen per maand binnen, dus de monitoring loopt tot ~1 maand achter.
+
 ### CI
 
 [GitHub Actions](.github/workflows/ci.yml) draait bij elke push: ruff, pytest, de **volledige pipeline + `dbt build` op een meegeleverde voorbeelddataset** ([`tests/fixtures/sample`](tests/fixtures/sample), 627 KB echte data, gemaakt met `python -m ov_vertraging.sample`) en het bouwen + starten van beide Docker-images.
@@ -94,7 +107,7 @@ Rijden de Treinen ──┐
   stations          │                  + 14 checks      (views)     (koppelingen)    (tabellen)
 KNMI uurweer ───────┘
 Feestdagen + schoolvakanties ─────────────────────────► seeds ──────┘
-                         Dagster draait dit elke dag om 07:00 · 69 asset checks + 101 tests
+                         Dagster draait dit elke dag om 07:00 · 70 asset checks + 110 tests
 ```
 
 ## Zelf draaien
@@ -160,6 +173,7 @@ Alle SQL staat in [`dashboard_queries.py`](src/ov_vertraging/dashboard_queries.p
 | `download` | `services_files`, `stations_file`, `weather_files` | Nieuwe maanden ophalen. Standaard de vorige en de huidige maand; een maand die nog niet gepubliceerd is (HTTP 404) wordt overgeslagen. |
 | `raw` | `raw/services`, `raw/stations`, `raw/weather_hourly`, `raw/weather_stations` | Laden in DuckDB. De 14 kwaliteitschecks zijn **blocking asset checks**: faalt er één, dan draait dbt niet op kapotte data. |
 | `seeds`, `staging`, `intermediate`, `marts` | 12 dbt-assets | Via `dagster-dbt`: elk dbt-model is een asset, elke dbt-test een asset check. |
+| `model` | `ml_features`, `model_predictions`, `model_monitoring` | Features bijwerken, het opgeslagen model laten voorspellen op nieuwe dagen, en per dag vergelijken met de werkelijkheid (zie Monitoring). |
 
 - **Job** `dagelijkse_pipeline`: alles, in de juiste volgorde (~1 minuut).
 - **Schema** `dagelijks_07u`: elke dag om 07:00 (Europe/Amsterdam), staat standaard aan.

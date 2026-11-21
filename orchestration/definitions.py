@@ -41,8 +41,9 @@ from dagster import (
 )
 from dagster_dbt import DagsterDbtTranslator, DbtCliResource, DbtProject, dbt_assets
 
-from ov_vertraging import download, download_weather, load, load_weather, quality
+from ov_vertraging import download, download_weather, load, load_weather, monitoring, quality
 from ov_vertraging.config import DB_PATH, PROJECT_ROOT
+from ov_vertraging.model import features as ml_features_module
 
 TIMEZONE = "Europe/Amsterdam"
 DBT_PROJECT_DIR = PROJECT_ROOT / "transform"
@@ -222,6 +223,83 @@ def ov_dbt_assets(context: AssetExecutionContext, dbt: DbtCliResource):
     yield from dbt.cli(["build"], context=context).stream()
 
 
+# ---------- model: features, voorspellingen op nieuwe dagen, monitoring ----------
+
+
+@asset(
+    group_name="model",
+    deps=[AssetKey(["marts", "fct_departures"])],
+    kinds={"duckdb"},
+    description="ml.departure_features: features met historie t/m gisteren (zie docs/model.md).",
+)
+def ml_features() -> MaterializeResult:
+    with duckdb.connect(str(DB_PATH)) as con:
+        n = ml_features_module.build_feature_table(con)
+    return MaterializeResult(metadata={"rijen": MetadataValue.int(n)})
+
+
+@asset(
+    group_name="model",
+    deps=[ml_features],
+    kinds={"python", "duckdb"},
+    description="Voorspellingen van het opgeslagen model voor alle nog niet gescoorde dagen "
+    "na de trainingsperiode (monitoring.predictions, incrementeel).",
+)
+def model_predictions(context: AssetExecutionContext) -> MaterializeResult:
+    with duckdb.connect(str(DB_PATH)) as con:
+        result = monitoring.score_new_days(con)
+    if result["model_version"] is None:
+        context.log.warning("Geen getraind model in models/; niets gescoord")
+    return MaterializeResult(
+        metadata={
+            "nieuwe_dagen": MetadataValue.int(result["days"]),
+            "nieuwe_vertrekken": MetadataValue.int(result["rows"]),
+            "modelversie": MetadataValue.text(str(result["model_version"])),
+        }
+    )
+
+
+@asset(
+    group_name="model",
+    deps=[model_predictions],
+    kinds={"duckdb"},
+    description="Per dag: voorspeld vs. werkelijk % vertraagd, PR-AUC, ROC-AUC, Brier "
+    "(monitoring.daily). Bron voor het tabblad Monitoring in het dashboard.",
+    check_specs=[AssetCheckSpec("kalibratie_laatste_30_dagen", asset="model_monitoring")],
+)
+def model_monitoring():
+    with duckdb.connect(str(DB_PATH)) as con:
+        daily = monitoring.daily_metrics(con)
+    ratio = monitoring.calibration_ratio(daily)
+    full = daily[daily.vertrekken >= monitoring.FULL_DAY_MIN]
+    recent = full.sort_values("datum").tail(30)
+    yield MaterializeResult(
+        metadata={
+            "dagen": MetadataValue.int(len(daily)),
+            "pr_auc_laatste_30_dagen": MetadataValue.float(
+                float(recent.pr_auc.mean()) if len(recent) else float("nan")
+            ),
+            "voorspeld_gedeeld_door_werkelijk": MetadataValue.float(
+                ratio if ratio is not None else float("nan")
+            ),
+        }
+    )
+    low, high = monitoring.CALIBRATION_RANGE
+    yield AssetCheckResult(
+        check_name="kalibratie_laatste_30_dagen",
+        # Waarschuwing, geen fout: een afwijkende kalibratie is een signaal om opnieuw te
+        # trainen, geen reden om de rest van de pipeline te stoppen.
+        passed=ratio is None or low <= ratio <= high,
+        severity=AssetCheckSeverity.WARN,
+        metadata={
+            "voorspeld_gedeeld_door_werkelijk": MetadataValue.float(
+                ratio if ratio is not None else float("nan")
+            ),
+            "marge": MetadataValue.text(f"{low} - {high}"),
+        },
+    )
+
+
 # ---------- job + schema ----------
 
 dagelijkse_pipeline = define_asset_job(
@@ -239,7 +317,16 @@ dagelijks_schema = ScheduleDefinition(
 )
 
 defs = Definitions(
-    assets=[services_files, stations_file, weather_files, raw_tables, ov_dbt_assets],
+    assets=[
+        services_files,
+        stations_file,
+        weather_files,
+        raw_tables,
+        ov_dbt_assets,
+        ml_features,
+        model_predictions,
+        model_monitoring,
+    ],
     jobs=[dagelijkse_pipeline],
     schedules=[dagelijks_schema],
     resources={"dbt": DbtCliResource(project_dir=dbt_project)},
