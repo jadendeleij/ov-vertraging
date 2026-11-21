@@ -75,6 +75,15 @@ def departures(base_url: str, station: str) -> dict:
     return _call("GET", f"{base_url}/departures/{station}")
 
 
+def sentence(text: str) -> str:
+    """Eerste letter hoofdletter, de rest ongemoeid.
+
+    Niet str.capitalize(): die zet de rest op klein, en dan wordt 'traject BGN-RSD'
+    'Traject bgn-rsd'.
+    """
+    return text[:1].upper() + text[1:]
+
+
 def format_pct(p: float | None) -> str:
     """0.0388 -> '3,9 %' (Nederlandse komma)."""
     return "–" if p is None else f"{100 * p:.1f} %".replace(".", ",")

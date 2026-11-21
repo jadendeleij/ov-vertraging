@@ -74,3 +74,8 @@ def test_next_full_hour():
 
     t = datetime(2026, 11, 21, 8, 55, tzinfo=ZoneInfo("Europe/Amsterdam"))
     assert api.next_full_hour(t) == datetime(2026, 11, 21, 9, 0)
+
+
+def test_sentence_laat_stationscodes_heel():
+    assert api.sentence("traject BGN-RSD") == "Traject BGN-RSD"
+    assert api.sentence("") == ""

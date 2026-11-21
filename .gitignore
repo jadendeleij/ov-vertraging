@@ -42,3 +42,6 @@ mlartifacts/
 # Python-bouwresten
 build/
 dist/
+
+# Ruwe schermopnames (de GIF gaat wel mee)
+docs/img/*.mov
