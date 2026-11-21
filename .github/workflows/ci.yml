@@ -73,6 +73,9 @@ jobs:
             -d '{"from_station":"Utrecht Centraal","to_station":"Amsterdam Centraal","departure_time":"2026-11-24T08:00"}' \
             | tee predict.json
           python3 -c "import json; r=json.load(open('predict.json')); assert 0 < r['probability'] < 1, r"
+          curl -fs http://localhost:8000/ | grep -q '<title>'          # website
+          curl -fs http://localhost:8000/app.js > /dev/null
+          curl -fs 'http://localhost:8000/insights?months=3' | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['kpis']['departures'] > 0, d"
           docker stats --no-stream --format 'API-geheugen: {{.MemUsage}}' api
 
       - name: Dashboard-image bouwen

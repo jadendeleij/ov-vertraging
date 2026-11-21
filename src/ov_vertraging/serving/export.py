@@ -245,8 +245,13 @@ def export(
     return manifest
 
 
-def package(serving_dir: Path = SERVING_DIR, out_dir: Path = MODELS_DIR) -> Path:
-    """Pak de export in als serving-<modelversie>.tar.gz (voor een GitHub Release).
+def package(
+    serving_dir: Path = SERVING_DIR, out_dir: Path = MODELS_DIR, label: str | None = None
+) -> Path:
+    """Pak de export in als serving-<label>.tar.gz (voor een GitHub Release).
+
+    Het label is standaard de modelversie. Verandert alleen de export (zelfde model,
+    nieuwe tabellen), geef dan een eigen label mee, bv. "20261121-web".
 
     Alleen de bekende bestanden gaan erin, zodat er nooit per ongeluk iets anders
     (zoals een .env) in een openbaar bestand belandt. Naast het archief komt een
@@ -269,7 +274,7 @@ def package(serving_dir: Path = SERVING_DIR, out_dir: Path = MODELS_DIR) -> Path
             "insights_weather",
         )
     ] + ["model.txt", "model_metadata.json", "manifest.json"]
-    archive = out_dir / f"serving-{manifest['model_version']}.tar.gz"
+    archive = out_dir / f"serving-{label or manifest['model_version']}.tar.gz"
     with tarfile.open(archive, "w:gz") as tar:
         for name in names:
             tar.add(serving_dir / name, arcname=name)
@@ -288,12 +293,13 @@ def main() -> None:
         action="store_true",
         help="Pak de bestaande export ook in als tar.gz (voor een Release).",
     )
+    parser.add_argument("--label", help="Naam van het pakket (standaard de modelversie).")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     with duckdb.connect(str(DB_PATH), read_only=True) as con:
         export(con)
     if args.package:
-        package()
+        package(label=args.label)
 
 
 if __name__ == "__main__":

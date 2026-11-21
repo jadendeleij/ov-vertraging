@@ -1,4 +1,4 @@
-# FastAPI-image. Bouwen vanuit de projectroot:
+# FastAPI-image: API én website (web/) in één dienst. Bouwen vanuit de projectroot:
 #   docker build -f api/Dockerfile -t ov-api .
 # Draaien (met de lokale serving-export als volume):
 #   docker run -p 8000:8000 -v "$PWD/models/serving:/app/models/serving:ro" --env-file .env ov-api
@@ -22,8 +22,9 @@ COPY src ./src
 RUN pip install --no-cache-dir ".[api]"
 
 COPY api ./api
+COPY web ./web
 
-ARG SERVING_VERSION=20261121
+ARG SERVING_VERSION=20261121-web
 ARG SERVING_BASE=https://github.com/jadendeleij/ov-vertraging/releases/download
 RUN mkdir -p models/serving && cd models \
     && if [ "$SERVING_VERSION" != "none" ]; then \
