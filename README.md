@@ -9,7 +9,7 @@ Voorspelt de kans dat een trein in Nederland ≥ 5 minuten vertraging heeft bij 
 - [x] Fase 1 – Data binnenhalen (treinarchief + stations → DuckDB, kwaliteitschecks)
 - [x] Fase 2 – Datapipeline (KNMI-weer, dbt, Dagster)
 - [x] Fase 3 – Analyse & dashboard
-- [ ] Fase 4 – Model (LightGBM)
+- [x] Fase 4 – Model (LightGBM)
 - [ ] Fase 5 – Live API + web-app
 - [ ] Fase 6 – Presenteren
 
@@ -22,6 +22,28 @@ Uit 17,2 mln binnenlandse treinvertrekken (nov 2025 – okt 2026), zie [het verk
 3. **Kleine vertragingen lopen meestal in.** Van de treinen met 3 minuten vertraging haalt maar 2,3 % later in de rit 10 minuten, en ruim een derde loopt in. Pas boven ~6 minuten loopt het uit de hand (bij 9 minuten: 42 %).
 
 De slechtste dagen kwamen door sneeuw en bevroren wissels (5–7 januari 2026), koperdiefstal en defecte treinen (17–18 november 2025) en een landelijke OV-staking (9 september 2026: 92 % uitval) — gebeurtenissen die geen model vooraf ziet aankomen.
+
+## Model
+
+Voorspelt per vertrek de kans op ≥ 5 min vertraging, een paar uur vóór vertrek, met alleen informatie die dan bekend is (dienstregeling, kalender, weer, geschiedenis t/m gisteren). Getest op september–oktober 2026, maanden die het model nooit zag. Volledige uitleg, leakage-regels en foutanalyse: [`docs/model.md`](docs/model.md).
+
+| Model (testset, 2,9 mln vertrekken) | PR-AUC ↑ | ROC-AUC ↑ | Brier ↓ |
+|---|---|---|---|
+| Willekeurig gokken | 0,042 | 0,500 | — |
+| Baseline: historisch % per traject × uur | 0,092 | 0,683 | 0,0391 |
+| Logistische regressie | 0,100 | 0,678 | 0,0390 |
+| **LightGBM** | **0,107** | **0,701** | **0,0389** |
+
+- LightGBM vindt vertragingen **2,5× zo goed als gokken**: de 10 % vertrekken met de hoogste voorspelde kans bevatten 28 % van alle vertragingen.
+- Belangrijkste drijfveren (SHAP): de geschiedenis van traject × uur, drukte op het spoor, het uur en de plek in de rit; daarna het weer.
+- Eerlijk: storingen, stormen en de nasleep van een staking zijn vooraf niet te zien; daar zit het model er het meest naast.
+
+<p>
+  <img src="docs/img/calibration.png" alt="Kalibratiecurve" width="45%">
+  <img src="docs/img/shap_summary.png" alt="SHAP-samenvatting" width="53%">
+</p>
+
+Trainen (≈ 20 min, 8 GB RAM is genoeg): `python -m ov_vertraging.model.train`
 
 ## Architectuur
 

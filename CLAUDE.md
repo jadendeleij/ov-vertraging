@@ -228,3 +228,12 @@ Werk dit bij na elke afgeronde taak (datum, wat gedaan, wat volgende stap).
   - Gestapelde balken met verschillende noemers vermeden (vertraagd = van gereden treinen, uitval = van alle).
   - Streamlit laadt gewijzigde geïmporteerde modules niet altijd opnieuw → na wijziging in `dashboard_queries.py` het dashboard herstarten.
   - Dashboard-screenshot (door jou) in `docs/img/dashboard.png` en README. Branch gepusht en PR naar main geopend; mergen na jouw akkoord. Volgende stap: Fase 4 (model, branch `fase-4-model`).
+- 2026-11-21 — Fase 4 (branch `fase-4-model`): `docs/model.md` (definitie, features, leakage, split op tijd, resultaten), `model/features.py` (`ml.departure_features`, 17,2 mln rijen, 29 features; historie t/m gisteren met smoothing), `model/train.py` (baseline, logistische regressie, LightGBM-grid met early stopping; MLflow in `mlflow.db`), `model/evaluate.py` (PR-AUC/ROC-AUC/Brier, per type/maand, kalibratie, SHAP via pred_contrib, foutanalyse). Model + metadata in `models/` (gitignored). 83 tests groen. Testset: LightGBM PR-AUC 0,107 / ROC 0,701 vs baseline 0,092 / 0,683; top 10% vangt 28% van de vertragingen. Bevindingen:
+  - 8 GB RAM: train-steekproef 2 mln (piek 6,7 GB). DuckDB nam `USING SAMPLE` vóór het WHERE-filter → nu subquery (getest).
+  - `pd.concat` van categoricals met andere categorieën geeft object-dtype → `category_lists(train, val)` maakt de vereniging.
+  - LightGBM onderschat (voorspeld 3,5% vs 4,2%): getraind t/m rustig augustus, getest in de herfst → hercalibratie als verbeterpunt.
+  - Grootste fouten: storm 22–25 okt 2026 en dag na staking 10 sep 2026.
+  - Mac viel tijdens training in slaap (5,6 u kloktijd, ~20 min rekentijd).
+  - Dashboard hield DB open → blokkeerde schrijven door Dagster; nu korte verbinding per query.
+  - Oud modelbestand `models/lightgbm_20261120.txt` (eerste run) staat nog lokaal; mag weg.
+  - Volgende stap: PR naar main; daarna Fase 5 (API, weersverwachting, Docker, CI, hosting — eerst overleggen).
