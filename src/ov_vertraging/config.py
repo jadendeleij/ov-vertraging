@@ -5,7 +5,8 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = PROJECT_ROOT / "data"
-RAW_DIR = DATA_DIR / "raw"
+# Overschrijfbaar, bv. om de pipeline in CI op de voorbeelddataset te draaien.
+RAW_DIR = Path(os.getenv("OV_RAW_DIR", DATA_DIR / "raw"))
 SERVICES_DIR = RAW_DIR / "services"
 STATIONS_DIR = RAW_DIR / "stations"
 # Overschrijfbaar (zelfde variabele als het dbt-profiel), bv. voor CI of het dashboard

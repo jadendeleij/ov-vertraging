@@ -1,0 +1,23 @@
+# Alles wat niet in een image hoort: data, omgevingen, secrets, bouwresten.
+.git
+.github
+.venv
+.env
+data/
+models/
+mlruns/
+mlartifacts/
+mlflow.db
+.dagster_home/
+.tmp_dagster_home_*/
+transform/target/
+transform/logs/
+notebooks/
+docs/
+tests/
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+*.duckdb
+.DS_Store
+.claude/

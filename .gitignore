@@ -3,7 +3,7 @@
 *.duckdb
 *.duckdb.wal
 *.csv.gz
-!tests/fixtures/*.csv.gz
+!tests/fixtures/**/*.csv.gz
 
 # Modellen en experimenten
 /models/
@@ -38,3 +38,7 @@ transform/.user.yml
 # MLflow (lokale experiment-tracking)
 mlflow.db
 mlartifacts/
+
+# Python-bouwresten
+build/
+dist/
