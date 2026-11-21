@@ -4,7 +4,9 @@
 
 Voorspelt de kans dat een trein in Nederland ≥ 5 minuten vertraging heeft bij vertrek, op basis van historische treindata en het weer.
 
-> 🚧 In aanbouw — zie de roadmap hieronder.
+**🌐 Probeer het live:** [ov-vertraging-app.onrender.com](https://ov-vertraging-app.onrender.com) (dashboard) · [API-documentatie](https://ov-vertraging-api.onrender.com/docs)
+
+> Gratis hosting: na 15 minuten zonder bezoek slaapt de app; het eerste bezoek duurt dan ~1 minuut.
 
 ## Roadmap
 
@@ -48,6 +50,8 @@ Voorspelt per vertrek de kans op ≥ 5 min vertraging, een paar uur vóór vertr
 Trainen (≈ 20 min, 8 GB RAM is genoeg): `python -m ov_vertraging.model.train`
 
 ## Live API en web-app
+
+**Online:** [dashboard](https://ov-vertraging-app.onrender.com) en [API](https://ov-vertraging-api.onrender.com/docs) op Render (gratis plan, Frankfurt), gedeployd via [`render.yaml`](render.yaml) bij elke push naar `main`.
 
 Het model draait achter een **FastAPI** ([`api/main.py`](api/main.py)) op een slanke export van 8 MB ([`serving/export.py`](src/ov_vertraging/serving/export.py)) in plaats van de database van 3 GB:
 

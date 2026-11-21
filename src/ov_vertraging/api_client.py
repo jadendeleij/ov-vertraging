@@ -4,11 +4,27 @@ Los van Streamlit zodat het testbaar is. Fouten van de API komen terug als ApiEr
 met de (Nederlandse) melding uit het 'detail'-veld.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import requests
 
+TZ = ZoneInfo("Europe/Amsterdam")
 TIMEOUT = 90  # Render free: een slapende API heeft ~1 minuut nodig om op te starten
+
+
+def now_nl() -> datetime:
+    """Huidige Nederlandse tijd, onafhankelijk van de klok van de server.
+
+    Servers (zoals Render) draaien meestal in UTC; datetime.now() zou daar een uur
+    (winter) of twee uur (zomer) achterlopen op Nederland.
+    """
+    return datetime.now(TZ)
+
+
+def next_full_hour(now: datetime) -> datetime:
+    """Het eerstvolgende hele uur, zonder tijdzone (= Nederlandse tijd voor de API)."""
+    return (now + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0, tzinfo=None)
 
 
 def base_url(url: str) -> str:

@@ -61,3 +61,16 @@ def test_format_pct():
 def test_base_url_voegt_schema_toe():
     assert api.base_url("ov-api.onrender.com/") == "https://ov-api.onrender.com"
     assert api.base_url("http://localhost:8000") == "http://localhost:8000"
+
+
+def test_now_nl_is_nederlandse_tijd():
+    now = api.now_nl()
+    assert str(now.tzinfo) == "Europe/Amsterdam"
+    assert now.utcoffset().total_seconds() / 3600 in (1, 2)
+
+
+def test_next_full_hour():
+    from zoneinfo import ZoneInfo
+
+    t = datetime(2026, 11, 21, 8, 55, tzinfo=ZoneInfo("Europe/Amsterdam"))
+    assert api.next_full_hour(t) == datetime(2026, 11, 21, 9, 0)
