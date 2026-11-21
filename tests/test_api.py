@@ -354,5 +354,7 @@ def test_website_wordt_geserveerd(predictor, tmp_path, monkeypatch):
     (web / "index.html").write_text("<!doctype html><title>OV</title>")
     monkeypatch.setattr(main, "WEB_DIR", web)
     with TestClient(main.create_app(predictor=predictor, ns=NSClient(api_key=None))) as c:
-        assert "<title>OV</title>" in c.get("/").text
+        page = c.get("/")
+        assert "<title>OV</title>" in page.text
+        assert page.headers["cache-control"] == "no-cache"  # na een deploy direct de nieuwe site
         assert c.get("/health").json()["status"] == "ok"  # API-routes gaan voor

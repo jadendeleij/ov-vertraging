@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="560" viewBox="0 0 1000 560" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <title>Architectuur OV-vertragingsvoorspeller</title>
+  <defs>
+    <marker id="pijl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#555"/>
+    </marker>
+    <style>
+      .kop { font-size: 13px; font-weight: 700; fill: #333; letter-spacing: .04em; }
+      .box { rx: 8; ry: 8; stroke-width: 1.5; }
+      .t { font-size: 14px; font-weight: 600; fill: #1a1a1a; }
+      .s { font-size: 11.5px; fill: #555; }
+      .lijn { stroke: #555; stroke-width: 1.6; fill: none; marker-end: url(#pijl); }
+      .stip { stroke: #555; stroke-width: 1.4; fill: none; stroke-dasharray: 5 4; marker-end: url(#pijl); }
+    </style>
+  </defs>
+
+  <!-- achtergrond: wit, zodat het plaatje ook in donkere modus leesbaar is -->
+  <rect width="1000" height="560" fill="#ffffff"/>
+
+  <!-- kolomkoppen -->
+  <text class="kop" x="20" y="28">BRONNEN</text>
+  <text class="kop" x="215" y="28">LADEN + CHECKS</text>
+  <text class="kop" x="410" y="28">TRANSFORMEREN (dbt)</text>
+  <text class="kop" x="785" y="28">GEBRUIK</text>
+
+  <!-- bronnen -->
+  <g>
+    <rect class="box" rx="8" x="20" y="45" width="165" height="52" fill="#eef4ff" stroke="#4c78a8"/>
+    <text class="t" x="32" y="67">Rijden de Treinen</text>
+    <text class="s" x="32" y="85">22,5 mln stops · stations</text>
+
+    <rect class="box" rx="8" x="20" y="110" width="165" height="52" fill="#eef4ff" stroke="#4c78a8"/>
+    <text class="t" x="32" y="132">KNMI uurweer</text>
+    <text class="s" x="32" y="150">46 stations × 8.760 uur</text>
+
+    <rect class="box" rx="8" x="20" y="175" width="165" height="52" fill="#eef4ff" stroke="#4c78a8"/>
+    <text class="t" x="32" y="197">Rijksoverheid</text>
+    <text class="s" x="32" y="215">feestdagen · vakanties</text>
+  </g>
+
+  <!-- laden -->
+  <rect class="box" rx="8" x="215" y="70" width="170" height="132" fill="#fff6e6" stroke="#e39c22"/>
+  <text class="t" x="227" y="95">Python → DuckDB</text>
+  <text class="s" x="227" y="115">download (idempotent)</text>
+  <text class="s" x="227" y="133">raw.* tabellen</text>
+  <text class="s" x="227" y="151">14 kwaliteitschecks</text>
+  <text class="s" x="227" y="169">(blokkeren bij fouten)</text>
+  <text class="s" x="227" y="190">seeds → dbt</text>
+
+  <!-- dbt -->
+  <rect class="box" rx="8" x="410" y="70" width="105" height="132" fill="#e9f7ef" stroke="#3a9d5d"/>
+  <text class="t" x="422" y="95">staging</text>
+  <text class="s" x="422" y="115">tijdzones</text>
+  <text class="s" x="422" y="133">eenheden</text>
+  <text class="s" x="422" y="151">datafouten</text>
+
+  <rect class="box" rx="8" x="525" y="70" width="115" height="132" fill="#e9f7ef" stroke="#3a9d5d"/>
+  <text class="t" x="537" y="95">intermediate</text>
+  <text class="s" x="537" y="115">trein → weer</text>
+  <text class="s" x="537" y="133">(haversine)</text>
+  <text class="s" x="537" y="151">trajecten</text>
+
+  <rect class="box" rx="8" x="650" y="70" width="115" height="132" fill="#e9f7ef" stroke="#3a9d5d"/>
+  <text class="t" x="662" y="95">marts</text>
+  <text class="s" x="662" y="115">fct_departures</text>
+  <text class="s" x="662" y="133">dim_station</text>
+  <text class="s" x="662" y="151">dim_date</text>
+  <text class="s" x="662" y="169">agg_route_hour</text>
+  <text class="s" x="410" y="222">77 dbt-tests · lineage in dbt docs</text>
+
+  <!-- gebruik -->
+  <rect class="box" rx="8" x="785" y="45" width="200" height="52" fill="#f4effa" stroke="#8a63b8"/>
+  <text class="t" x="797" y="67">Analyse + dashboard</text>
+  <text class="s" x="797" y="85">notebook · Streamlit (lokaal)</text>
+
+  <rect class="box" rx="8" x="785" y="110" width="200" height="52" fill="#f4effa" stroke="#8a63b8"/>
+  <text class="t" x="797" y="132">Model: LightGBM</text>
+  <text class="s" x="797" y="150">split op tijd · SHAP · MLflow</text>
+
+  <rect class="box" rx="8" x="785" y="175" width="200" height="52" fill="#f4effa" stroke="#8a63b8"/>
+  <text class="t" x="797" y="197">Monitoring</text>
+  <text class="s" x="797" y="215">voorspeld vs. werkelijk per dag</text>
+
+  <!-- pijlen bovenste rij -->
+  <path class="lijn" d="M185,71 L213,100"/>
+  <path class="lijn" d="M185,136 L213,136"/>
+  <path class="lijn" d="M185,201 L213,180"/>
+  <path class="lijn" d="M385,136 L408,136"/>
+  <path class="lijn" d="M515,136 L523,136"/>
+  <path class="lijn" d="M640,136 L648,136"/>
+  <path class="lijn" d="M765,100 L783,75"/>
+  <path class="lijn" d="M765,136 L783,136"/>
+  <path class="lijn" d="M765,175 L783,198"/>
+
+  <!-- live deel -->
+  <text class="kop" x="260" y="290">LIVE (RENDER, GRATIS)</text>
+
+  <rect class="box" rx="8" x="20" y="305" width="190" height="62" fill="#fdecec" stroke="#d62728"/>
+  <text class="t" x="32" y="328">Serving-export</text>
+  <text class="s" x="32" y="346">8 MB i.p.v. 3 GB · GitHub</text>
+  <text class="s" x="32" y="361">Release + sha256</text>
+
+  <rect class="box" rx="8" x="260" y="305" width="270" height="62" fill="#fdecec" stroke="#d62728"/>
+  <text class="t" x="272" y="328">FastAPI (Docker)</text>
+  <text class="s" x="272" y="346">/predict · /departures · /insights</text>
+  <text class="s" x="272" y="361">kans + uitleg in gewone taal</text>
+
+  <rect class="box" rx="8" x="570" y="305" width="190" height="62" fill="#fdecec" stroke="#d62728"/>
+  <text class="t" x="582" y="328">Website</text>
+  <text class="s" x="582" y="346">HTML/CSS/JS, door FastAPI</text>
+  <text class="s" x="582" y="361">geserveerd (één dienst)</text>
+
+  <rect class="box" rx="8" x="800" y="305" width="185" height="62" fill="#ffffff" stroke="#999"/>
+  <text class="t" x="812" y="328">👤 Reiziger</text>
+  <text class="s" x="812" y="346">ov-vertraging-api</text>
+  <text class="s" x="812" y="361">.onrender.com</text>
+
+  <rect class="box" rx="8" x="260" y="400" width="130" height="44" fill="#eef4ff" stroke="#4c78a8"/>
+  <text class="t" x="272" y="420">Open-Meteo</text>
+  <text class="s" x="272" y="436">KNMI-verwachting</text>
+
+  <rect class="box" rx="8" x="400" y="400" width="130" height="44" fill="#eef4ff" stroke="#4c78a8"/>
+  <text class="t" x="412" y="420">NS API</text>
+  <text class="s" x="412" y="436">live vertrektijden</text>
+
+  <path class="stip" d="M985,136 L994,136 L994,252 L115,252 L115,303"/>
+  <text class="s" x="560" y="246">model + lookups exporteren (8 MB)</text>
+  <path class="lijn" d="M210,336 L258,336"/>
+  <path class="lijn" d="M570,336 L532,336"/>
+  <path class="lijn" d="M800,336 L762,336"/>
+  <path class="lijn" d="M325,400 L325,369"/>
+  <path class="lijn" d="M465,400 L465,369"/>
+
+  <!-- onderbalk -->
+  <rect x="20" y="475" width="960" height="66" rx="8" fill="#f5f5f5" stroke="#ccc"/>
+  <text class="t" x="36" y="500">⏱ Dagster</text>
+  <text class="s" x="36" y="520">draait alles elke dag om 07:00 · 22 assets · 70 checks</text>
+  <text class="t" x="390" y="500">✅ GitHub Actions</text>
+  <text class="s" x="390" y="520">ruff · 115 tests · pipeline + dbt op voorbeelddata · Docker</text>
+  <text class="t" x="760" y="500">🐳 Docker + render.yaml</text>
+  <text class="s" x="760" y="520">infrastructuur als code</text>
+</svg>

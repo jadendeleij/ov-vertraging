@@ -140,6 +140,15 @@ def _delay_min(planned: datetime | None, actual: datetime | None) -> int | None:
     return round((actual - planned).total_seconds() / 60)
 
 
+class WebFiles(StaticFiles):
+    """Statische website; browsers controleren bij elk bezoek of er een nieuwe versie is."""
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 # ---------- app ----------
 
 
@@ -338,7 +347,7 @@ def create_app(predictor: Predictor | None = None, ns: NSClient | None = None) -
 
     # De website als laatste: API-routes hierboven gaan voor.
     if WEB_DIR.exists():
-        app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")
+        app.mount("/", WebFiles(directory=WEB_DIR, html=True), name="web")
 
     return app
 
